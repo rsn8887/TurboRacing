@@ -4,7 +4,7 @@
 
 #define GAME_TITLE   "Turbo Racing"
 #ifndef GAME_VERSION
-#define GAME_VERSION "1.0.0"     // set by CMake from project(... VERSION)
+#define GAME_VERSION "1.1.0"     // set by CMake from project(... VERSION)
 #endif
 
 // Internal framebuffer (16:9, scales 2x to 720p and 3x to 1080p)
