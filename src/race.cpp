@@ -44,10 +44,14 @@ static double carAccel(const CarStats& st, double u, double power, bool dirt, bo
         double dt = st.dirtTop * st.top;
         res += std::max(0.0, (P / dt - ROLLING) / (dt * dt) - drag) * u * u;
     }
-    if (offroad) res += OFFROAD_DRAG;
+    if (offroad) res += OFFROAD_ROLL + OFFROAD_DRAG * u * u;   // grows with speed: no wall at low speed
     // gravity along the slope; capped because the pseudo-3D hills are far steeper than real roads -
-    // every car can always crawl up a hill, but heavy cars lose a lot of speed on long climbs
-    return drive - res - std::clamp(HILL_G * st.weight * slope, -0.09, 0.055);
+    // heavy cars lose a lot of speed on long climbs
+    double a = drive - res - std::clamp(HILL_G * st.weight * slope, -0.09, 0.055);
+    // but with the throttle down, no surface or hill can hold a car at a standstill (grass + dirt + a climb
+    // would otherwise take more than the tyres can give)
+    if (power > 0) a = std::max(a, CRAWL_ACCEL * power * (1 - u / CRAWL_SPEED));
+    return a;
 }
 
 std::vector<Driver> makeDrivers(int players) {
