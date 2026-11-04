@@ -1,0 +1,15 @@
+Copyright (c) 2013-2026 rsn8887
+
+The above copyright holds for all material in this project. 
+
+This software is provided 'as-is', without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
+
+This program is not free software.
+
+
+The fonts in fonts/ (Russo One by Jovanny Lemonad, Chakra Petch by The Chakra Petch Project Authors)
+are licensed under the SIL Open Font License 1.1; see fonts/OFL-*.txt.
+SDL2 and SDL2_ttf are distributed under the zlib license.
+
+third_party/stb/stb_image.h and stb_image_write.h are by Sean Barrett and are in the
+public domain (or MIT licensed, at your choice); see the end of each file.

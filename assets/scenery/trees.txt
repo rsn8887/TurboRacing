@@ -1,0 +1,6 @@
+# scenery atlas: name  x y w h
+palm  1 1 268 348
+pine  270 1 172 324
+pine_snow  443 1 172 324
+bush  753 1 200 100
+cactus  616 1 136 246

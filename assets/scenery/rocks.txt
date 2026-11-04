@@ -1,0 +1,3 @@
+# scenery atlas: name  x y w h
+rock  130 1 200 116
+snowman  1 1 128 176

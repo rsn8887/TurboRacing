@@ -1,0 +1,4 @@
+# background layers of COCONUT COAST, back to front: layer  x y w h  parallax  yOffset
+layer  1 1 2048 180  0.05 -70
+layer  1 182 2048 160  0.1 0
+layer  1 343 2048 100  0.25 0

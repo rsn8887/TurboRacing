@@ -1,0 +1,4 @@
+# background layers of MISTY FOREST, back to front: layer  x y w h  parallax  yOffset
+layer  1 1 2048 160  0.08 0
+layer  1 162 2048 128  0.15 0
+layer  1 291 2048 128  0.25 4

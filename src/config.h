@@ -1,0 +1,71 @@
+// Turbo Racing - pseudo-3D arcade racer in C++/SDL2
+#pragma once
+#include <cstdint>
+
+#define GAME_TITLE   "Turbo Racing"
+#ifndef GAME_VERSION
+#define GAME_VERSION "1.0.0"     // set by CMake from project(... VERSION)
+#endif
+
+// Internal framebuffer (16:9, scales 2x to 720p and 3x to 1080p)
+// Layout units: menus, HUD and text are laid out on a 640x360 grid. The game itself is rendered at
+// RENDER_SCALE times that, i.e. 1280x720 (native on Nintendo Switch, 2x on a 2560x1440 Retina window).
+constexpr int SCREEN_W = 640;
+constexpr int SCREEN_H = 360;
+#ifndef TURBO_RENDER_SCALE
+#define TURBO_RENDER_SCALE 2          // cmake -DTURBO_RENDER_SCALE=1 renders at 640x360 (for slow machines)
+#endif
+constexpr int RENDER_SCALE = TURBO_RENDER_SCALE;
+constexpr int CANVAS_W = SCREEN_W * RENDER_SCALE;   // 1280
+constexpr int CANVAS_H = SCREEN_H * RENDER_SCALE;   // 720
+
+constexpr double STEP = 1.0 / 60.0;     // fixed simulation step
+
+// ---- World / projection ---------------------------------------------------
+constexpr double SEG_LEN       = 200.0;   // length of one road segment
+constexpr double SPEED_SCALE   = 1.6;     // world speed multiplier: higher = road rushes past faster
+constexpr double STRIPE_LEN    = 400.0 * SPEED_SCALE;   // light/dark alternation (like the zOffset trick in main.lua)
+constexpr double ROAD_WIDTH    = 2000.0;  // half width of the road (4 lanes, as in test1.png)
+constexpr double CAMERA_HEIGHT = 1000.0;
+constexpr double FIELD_OF_VIEW = 100.0;   // degrees
+constexpr int    DRAW_DIST     = 300;     // segments drawn ahead
+constexpr double HORIZON_FRAC  = 0.47;    // horizon position in the viewport (0=top)
+
+// ---- Car -------------------------------------------------------------------
+constexpr double MAX_SPEED     = SEG_LEN / STEP * SPEED_SCALE;  // 19200 units/s (~ 290 km/h displayed)
+constexpr double KMH_AT_MAX    = 290.0;
+// Longitudinal physics (all rates in "fractions of MAX_SPEED per second"):
+//   accel = min(traction, power / speed) - drag * speed^2 - rolling - brakes - gravity * slope
+// Drag balances the engine just above top speed; the rev limiter caps the car at top speed.
+// Tuned for a heavy feel: 0-100 km/h ~5 s, 0-200 ~11.5 s, 0-250 ~17 s, flat out after ~30 s.
+constexpr double ENGINE_POWER  = 0.100;
+constexpr double TRACTION      = 0.085;   // max accel the tyres can transmit (from a standstill)
+constexpr double ROLLING       = 0.012;   // rolling resistance
+constexpr double DRAG_BALANCE  = 1.08;    // drag equals engine power at this multiple of top speed
+constexpr double ENGINE_BRAKE  = 0.065;   // extra slowing when off the throttle (engine braking + friction)
+constexpr double BRAKE_DECEL   = 0.40;    // full brakes (~1.1 g)
+constexpr double OFFROAD_DRAG  = 0.30;    // grass/sand: top speed ~90 km/h, slows you down gradually
+constexpr double CRASH_DECEL   = 0.55;    // sliding/spinning to a stop after a crash
+constexpr double LATERAL_RESP  = 4.5;     // how quickly the car's sideways motion follows the steering (inertia)
+constexpr double CENTRIFUGAL   = 0.22;
+constexpr double DIRT_TOP      = 0.78;    // top speed on dirt (fraction of MAX_SPEED)
+constexpr double DIRT_GRIP     = 0.7;     // steering response on dirt
+constexpr double DIRT_SLIDE    = 1.45;    // extra centrifugal drift on dirt
+constexpr double CAR_WORLD_W   = 720.0;   // width of a car body in world units (collisions)
+constexpr double HILL_G        = 0.16;    // gravity along slopes (x car weight factor)
+constexpr double OVERSPEED     = 1.15;    // downhill you can go this much faster than top speed
+constexpr double GRAVITY       = 6000.0;  // free fall in world units / s^2: jumps hang ~1 s on smooth parabolas
+constexpr double TAKEOFF_ACCEL = GRAVITY * 4.5;   // suspension + downforce keep you on the road over gentle crests
+constexpr int    NUM_GEARS     = 5;
+
+constexpr int    NUM_CARS      = 20;      // grid size (players + AI)
+// staggered starting grid: consecutive cars alternate left/right and are GRID_SLOT apart, so every car has
+// an empty slot in front of it on its own side of the road (2 * GRID_SLOT to the car ahead on the same side)
+constexpr double GRID_SLOT     = SEG_LEN * 5.5;
+constexpr double GRID_FRONT    = SEG_LEN * 1.5;   // pole position: this far behind the start line
+constexpr int    QUALIFY_POS   = 10;      // finish in the top 10 to continue the championship
+
+// ---- Colors ----------------------------------------------------------------
+using Color = uint32_t;                   // 0xAARRGGBB
+constexpr Color rgb(int r, int g, int b) { return 0xFF000000u | (uint32_t(r & 255) << 16) | (uint32_t(g & 255) << 8) | uint32_t(b & 255); }
+constexpr Color TRANSPARENT = 0;

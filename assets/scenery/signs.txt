@@ -1,0 +1,12 @@
+# scenery atlas: name  x y w h
+billboard1  1299 1 340 216
+billboard2  1640 1 340 216
+billboard3  1 266 340 216
+turn_left  1146 266 200 168
+turn_right  1347 266 200 168
+gantry_start  1 1 648 264
+gantry_check  650 1 648 264
+sign_jump  342 266 200 176
+sign_narrow  543 266 200 176
+sign_tunnel  744 266 200 176
+sign_dirt  945 266 200 176
