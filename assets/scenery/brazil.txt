@@ -1,0 +1,4 @@
+# scenery atlas: name  x y w h
+tropical  443 1 208 124
+carnival  1 1 152 364
+favela  154 1 288 356

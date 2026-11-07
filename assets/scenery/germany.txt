@@ -1,0 +1,4 @@
+# scenery atlas: name  x y w h
+fachwerk  254 1 292 408
+autobahn_sign  547 1 312 224
+wind_turbine  1 1 252 608

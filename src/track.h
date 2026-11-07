@@ -9,12 +9,19 @@ enum SpriteType {
     SPR_BILLBOARD1, SPR_BILLBOARD2, SPR_BILLBOARD3, SPR_BUILDING1, SPR_BUILDING2,
     SPR_SNOWMAN, SPR_TURN_LEFT, SPR_TURN_RIGHT, SPR_GANTRY_START, SPR_GANTRY_CHECK,
     SPR_SIGN_JUMP, SPR_SIGN_NARROW, SPR_SIGN_TUNNEL, SPR_SIGN_DIRT,
+    // stages 7-11 (appended, so the original sprites keep their numbers)
+    SPR_HOLO_PYLON, SPR_SCIFI_TOWER, SPR_UFO, SPR_HOLO_SIGN,          // future
+    SPR_TROPICAL, SPR_CARNIVAL, SPR_FAVELA,                           // Brazil
+    SPR_PARIS_LAMP, SPR_HAUSSMANN, SPR_CAFE, SPR_TREE_ROUND,          // Paris (round tree also in Germany)
+    SPR_FACHWERK, SPR_AUTOBAHN_SIGN, SPR_WIND_TURBINE,                // Germany
+    SPR_CYPRESS, SPR_VILLA, SPR_OLIVE,                                // Tuscany
     SPR_COUNT
 };
 
 struct SpriteInfo {
     double worldH;       // height in world units
     double hitFrac;      // fraction of the drawn width that collides (0 = no collision)
+    bool mirrorRight = false;   // drawn mirrored on the right side of the road (street lamps reaching over the road)
 };
 extern const SpriteInfo SPRITE_INFO[SPR_COUNT];
 
@@ -51,6 +58,14 @@ constexpr int    TUNNEL_LAMP_EVERY = 16; // segments between the rows of tunnel 
 constexpr double RAIL_POS      = 1.24;   // guardrail position (road half widths)
 constexpr double RAIL_HEIGHT   = 420;
 
+// how the road surface is painted
+enum RoadStyle : uint8_t {
+    ROAD_ASPHALT,    // grey asphalt with light / dark bands (the original stages)
+    ROAD_CHECKER,    // chequerboard tiles (future)
+    ROAD_RAINBOW,    // flowing rainbow colours (Brazil)
+    ROAD_COBBLE,     // cobblestones (Paris)
+};
+
 struct Theme {
     std::string name;
     Color skyTop, skyBottom, horizonGround;
@@ -66,9 +81,12 @@ struct Theme {
     // road surfaces / edges
     Color dirtLight, dirtDark, shoulder, rail;
     Kerb  kerb;                               // default kerb style of the stage
+    RoadStyle road = ROAD_ASPHALT;
+    Color roadAlt = 0;                        // second tile colour (chequerboard) / stone joints (cobbles)
+    Color grid = 0;                           // if set: glowing grid lines on the verge (future)
 };
 
-constexpr int NUM_STAGES = 6;
+constexpr int NUM_STAGES = 11;
 
 class Track {
 public:

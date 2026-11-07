@@ -1,0 +1,5 @@
+# scenery atlas: name  x y w h
+holo_pylon  234 1 152 444
+scifi_tower  1 1 232 548
+ufo  387 1 248 304
+holo_sign  636 1 340 216

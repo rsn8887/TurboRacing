@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(TurboRacing VERSION 1.1.0 LANGUAGES CXX)
+project(TurboRacing VERSION 1.2.0 LANGUAGES CXX)
 add_compile_definitions(GAME_VERSION="${PROJECT_VERSION}")
 
 set(CMAKE_CXX_STANDARD 17)

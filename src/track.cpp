@@ -9,7 +9,7 @@ const SpriteInfo SPRITE_INFO[SPR_COUNT] = {
     { 800, 0.70},  // BUSH
     {1700, 0.45},  // CACTUS
     { 900, 0.80},  // ROCK
-    {2700, 0.12},  // LAMP
+    {2700, 0.12, true},  // LAMP
     {2000, 0.90},  // BILLBOARD1
     {2000, 0.90},  // BILLBOARD2
     {2000, 0.90},  // BILLBOARD3
@@ -24,10 +24,28 @@ const SpriteInfo SPRITE_INFO[SPR_COUNT] = {
     {1500, 0.80},  // SIGN_NARROW
     {1500, 0.80},  // SIGN_TUNNEL
     {1500, 0.80},  // SIGN_DIRT
+    {3000, 0.12, true},  // HOLO_PYLON (street light of the future)
+    {7500, 0.90},  // SCIFI_TOWER
+    {3400, 0.00},  // UFO (hovers: nothing to hit)
+    {2100, 0.90},  // HOLO_SIGN
+    {1200, 0.75},  // TROPICAL
+    {2600, 0.20},  // CARNIVAL
+    {4600, 0.95},  // FAVELA
+    {2700, 0.12, true},  // PARIS_LAMP
+    {6200, 0.95},  // HAUSSMANN
+    {2400, 0.90},  // CAFE
+    {2900, 0.30},  // TREE_ROUND
+    {4800, 0.95},  // FACHWERK
+    {2400, 0.85},  // AUTOBAHN_SIGN
+    {8000, 0.08},  // WIND_TURBINE
+    {3600, 0.35},  // CYPRESS
+    {4200, 0.95},  // VILLA
+    {1700, 0.45},  // OLIVE
 };
 
 const char* STAGE_NAMES[NUM_STAGES] = {
-    "COCONUT COAST", "DESERT CANYON", "NEON NIGHT", "ALPINE PASS", "MISTY FOREST", "SUNSET BOULEVARD"
+    "COCONUT COAST", "DESERT CANYON", "NEON NIGHT", "ALPINE PASS", "MISTY FOREST", "SUNSET BOULEVARD",
+    "HYPERION 2099", "RIO CARNIVAL", "PARIS", "AUTOBAHN", "FLORENCE"
 };
 
 namespace {
@@ -73,12 +91,46 @@ Theme makeTheme(int stage) {
         t.grassLight = rgb(40, 120, 40); t.grassDark = rgb(30, 100, 35);
         t.roadLight = rgb(100, 100, 100); t.roadDark = rgb(92, 92, 92);
         t.background = 4; break;
-    default: // sunset
+    case 5: // sunset
         t.skyTop = rgb(40, 20, 90); t.skyBottom = rgb(255, 120, 60); t.horizonGround = rgb(120, 60, 60);
         t.grassLight = rgb(210, 120, 60); t.grassDark = rgb(190, 100, 50);
         t.roadLight = rgb(96, 80, 96); t.roadDark = rgb(88, 72, 88);
         t.rumbleB = rgb(255, 220, 120);
         t.background = 5; t.sun = true; break;
+    case 6: // future: a sunlit utopia - a beige chequerboard road, white towers, teal accents, a pale planet by day
+        t.skyTop = rgb(96, 160, 206); t.skyBottom = rgb(252, 226, 198); t.horizonGround = rgb(216, 198, 168);
+        t.fogColor = rgb(246, 226, 204); t.fogDensity = 0.000018;
+        t.grassLight = rgb(230, 216, 190); t.grassDark = rgb(220, 204, 176);
+        t.roadLight = rgb(238, 224, 194); t.roadDark = rgb(232, 218, 188);
+        t.road = ROAD_CHECKER; t.roadAlt = rgb(198, 172, 134);
+        t.grid = rgb(30, 168, 170);
+        t.rumbleA = rgb(30, 168, 170); t.rumbleB = rgb(250, 248, 240); t.lane = rgb(30, 150, 160);
+        t.background = 6; break;
+    case 7: // Rio: a psychedelic rainbow road, Sugarloaf and the statue on the hill
+        t.skyTop = rgb(255, 40, 160); t.skyBottom = rgb(255, 200, 60); t.horizonGround = rgb(0, 150, 90);
+        t.grassLight = rgb(40, 230, 70); t.grassDark = rgb(250, 220, 0);
+        t.roadLight = rgb(150, 60, 200); t.roadDark = rgb(140, 50, 190);
+        t.road = ROAD_RAINBOW;
+        t.rumbleA = rgb(0, 80, 220); t.rumbleB = rgb(255, 230, 0); t.lane = rgb(255, 255, 255);
+        t.background = 7; t.sun = true; break;
+    case 8: // Paris: cobblestones, pale limestone and the tower at dusk
+        t.skyTop = rgb(90, 110, 170); t.skyBottom = rgb(250, 190, 170); t.horizonGround = rgb(150, 140, 130);
+        t.grassLight = rgb(196, 186, 168); t.grassDark = rgb(184, 174, 156);   // sand-coloured pavements
+        t.roadLight = rgb(120, 118, 122); t.roadDark = rgb(112, 110, 114);
+        t.road = ROAD_COBBLE; t.roadAlt = rgb(70, 68, 72);
+        t.rumbleA = rgb(30, 50, 150); t.rumbleB = rgb(240, 240, 240); t.lane = rgb(235, 235, 235);
+        t.background = 8; break;
+    case 9: // Autobahn: wide motorway through green hills, half-timbered villages and a fairy-tale castle
+        t.skyTop = rgb(70, 130, 220); t.skyBottom = rgb(200, 225, 250); t.horizonGround = rgb(70, 140, 60);
+        t.grassLight = rgb(90, 180, 60); t.grassDark = rgb(76, 160, 52);
+        t.roadLight = rgb(110, 112, 118); t.roadDark = rgb(102, 104, 110);
+        t.background = 9; break;
+    default: // 10 Florence: Tuscan hills, cypresses, white gravel roads and the cathedral dome
+        t.skyTop = rgb(60, 130, 220); t.skyBottom = rgb(250, 230, 190); t.horizonGround = rgb(170, 160, 90);
+        t.grassLight = rgb(176, 184, 80); t.grassDark = rgb(160, 168, 70);
+        t.roadLight = rgb(126, 116, 108); t.roadDark = rgb(118, 108, 100);
+        t.rumbleA = rgb(190, 70, 40); t.rumbleB = rgb(245, 235, 210);
+        t.background = 10; t.sun = true; break;
     }
     // dirt, gravel shoulders, guardrails and default kerb style
     t.dirtLight = rgb(176, 132, 84); t.dirtDark = rgb(160, 118, 74);
@@ -90,6 +142,11 @@ Theme makeTheme(int stage) {
     case 3: t.dirtLight = rgb(150, 140, 130); t.dirtDark = rgb(136, 126, 118); t.shoulder = rgb(200, 205, 215); t.kerb = KERB_SOLID; break;
     case 4: t.dirtLight = rgb(130, 98, 64); t.dirtDark = rgb(116, 86, 56); t.shoulder = rgb(110, 100, 80); t.kerb = KERB_SOLID; break;
     case 5: t.shoulder = rgb(200, 150, 110); break;
+    case 6: t.kerb = KERB_ZEBRA; t.shoulder = rgb(206, 190, 162); t.rail = rgb(214, 226, 230); break;
+    case 7: t.dirtLight = rgb(230, 120, 60); t.dirtDark = rgb(210, 100, 50); t.kerb = KERB_ZEBRA; break;
+    case 8: t.kerb = KERB_SOLID; t.shoulder = rgb(206, 198, 184); break;
+    case 9: t.kerb = KERB_SOLID; t.shoulder = rgb(150, 150, 140); break;
+    case 10: t.dirtLight = rgb(236, 226, 204); t.dirtDark = rgb(222, 210, 186); t.shoulder = rgb(210, 196, 160); break;   // strade bianche
     default: break;
     }
     // tunnel looks: concrete by default, rock faces in the countryside
@@ -104,6 +161,12 @@ Theme makeTheme(int stage) {
     case 3: t.facade = rgb(130, 136, 150); t.facadeCap = rgb(250, 252, 255); break;
     case 4: t.facade = rgb(110, 110, 100); t.facadeCap = rgb(40, 100, 45); break;
     case 5: t.wallA = rgb(176, 126, 136); t.wallB = rgb(146, 100, 112); t.facade = rgb(150, 90, 90); t.facadeCap = rgb(230, 130, 70); t.rockFacade = false; break;
+    case 6: t.wallA = rgb(226, 222, 210); t.wallB = rgb(196, 192, 180); t.lamp = rgb(150, 250, 240);
+            t.facade = rgb(232, 228, 216); t.facadeCap = rgb(30, 168, 170); t.rockFacade = false; break;
+    case 7: t.facade = rgb(90, 120, 80); t.facadeCap = rgb(40, 200, 80); break;
+    case 8: t.facade = rgb(200, 190, 170); t.facadeCap = rgb(110, 120, 140); t.rockFacade = false; break;
+    case 9: t.facade = rgb(150, 150, 146); t.facadeCap = rgb(60, 150, 60); t.rockFacade = false; break;
+    case 10: t.facade = rgb(200, 170, 120); t.facadeCap = rgb(190, 90, 50); break;
     default: break;
     }
     return t;
@@ -325,7 +388,7 @@ void Track::layout(int st) {
         sCurves(SHORT, MED, -LOW);
         curve(MEDIUM, HARD);
         break;
-    default:
+    case 5:
         straight(MEDIUM);
         kerb(KERB_GUARDRAIL);
         width(SHORT, 1.5);                   // wide beach highway with crash barriers
@@ -350,6 +413,124 @@ void Track::layout(int st) {
         curve(MEDIUM, MED);
         curve(MEDIUM, -HARD, LOW);
         straight(MEDIUM);
+        break;
+    case 6:   // future: fast and flowing, with neon tunnels and big jumps
+        straight(MEDIUM);
+        kerb(KERB_GUARDRAIL);
+        width(SHORT, 1.5);                   // wide skyway between energy barriers
+        curve(LONG, EASY, MID);
+        straight(MEDIUM);
+        kerbDefault();
+        width(SHORT, 1.0);
+        tunnel(SHORT, -MED);                 // neon tube
+        jump(0.20);
+        sCurves(SHORT, MED, LOW);
+        curve(MEDIUM, HARD, -MID);
+        hill(MEDIUM, HIGH);
+        jump(0.22);
+        curve(LONG, -MED, -LOW);
+        tunnel(SHORT, EASY);
+        kerb(KERB_GUARDRAIL);
+        width(SHORT, 0.7);                   // narrow maintenance lane
+        sCurves(SHORT, HARD);
+        kerbDefault();
+        width(SHORT, 1.0);
+        straight(LONG);
+        jump(0.16);
+        curve(MEDIUM, -HARD);
+        break;
+    case 7:   // Rio: up and down the hills by the bay, a sandy favela track
+        straight(SHORT);
+        curve(MEDIUM, MED, HIGH);
+        curve(MEDIUM, -MED, -MID);
+        bumps(MID);
+        surface(SURF_DIRT);                  // red dirt up through the favela
+        sCurves(SHORT, MED, LOW);
+        curve(MEDIUM, HARD, MID);
+        surface(SURF_ASPHALT);
+        jump(0.18);
+        kerb(KERB_RUMBLE);
+        width(SHORT, 1.5);                   // wide beach avenue
+        straight(LONG);
+        curve(LONG, -EASY);
+        kerbDefault();
+        width(SHORT, 1.0);
+        tunnel(SHORT, MED);                  // through the mountain
+        hill(MEDIUM, -HIGH);
+        sCurves(SHORT, HARD, LOW);
+        jump(0.14);
+        curve(MEDIUM, -MED, -LOW);
+        break;
+    case 8:   // Paris: boulevards, tight corners around the old town, underpasses along the river
+        straight(SHORT);
+        curve(SHORT, -HARD);
+        width(SHORT, 1.5);                   // the grand avenue
+        straight(LONG);
+        curve(MEDIUM, EASY);
+        width(SHORT, 1.0);
+        curve(SHORT, HARD);
+        curve(SHORT, -HARD);
+        tunnel(SHORT, -EASY);                // underpass by the river
+        straight(MEDIUM);
+        kerb(KERB_GUARDRAIL);
+        width(SHORT, 0.7);                   // narrow embankment road
+        sCurves(SHORT, MED);
+        kerbDefault();
+        width(SHORT, 1.0);
+        hill(MEDIUM, MID);                   // up to the hill of the artists
+        curve(MEDIUM, HARD, LOW);
+        jump(0.14);
+        hill(MEDIUM, -MID);
+        sCurves(SHORT, HARD);
+        curve(MEDIUM, -MED);
+        break;
+    case 9:   // Autobahn: long, wide and fast, then winding through the forest past the castle
+        straight(MEDIUM);
+        kerb(KERB_GUARDRAIL);
+        width(SHORT, 1.5);                   // six lanes between crash barriers
+        straight(LONG);
+        curve(LONG, EASY);
+        straight(LONG);
+        curve(LONG, -EASY, LOW);
+        straight(LONG);
+        kerbDefault();
+        width(SHORT, 1.0);
+        tunnel(SHORT, EASY);
+        curve(MEDIUM, -MED, MID);
+        sCurves(SHORT, MED, LOW);
+        kerb(KERB_RUMBLE);
+        curve(MEDIUM, HARD, -MID);
+        jump(0.16);
+        bumps(LOW);
+        kerbDefault();
+        curve(LONG, -MED);
+        straight(MEDIUM);
+        break;
+    default:  // 10 Florence: rolling hills, cypress avenues and white gravel roads
+        straight(SHORT);
+        hill(MEDIUM, MID);
+        curve(MEDIUM, MED, -LOW);
+        surface(SURF_DIRT);                  // strade bianche
+        width(SHORT, 0.8);
+        sCurves(SHORT, MED, MID);
+        curve(MEDIUM, -HARD, -MID);
+        surface(SURF_ASPHALT);
+        width(SHORT, 1.0);
+        curve(LONG, EASY, HIGH);
+        jump(0.18);
+        hill(MEDIUM, -HIGH);
+        kerb(KERB_GUARDRAIL);
+        width(SHORT, 0.7);                   // narrow lane along the river
+        curve(MEDIUM, -MED);
+        kerbDefault();
+        width(SHORT, 1.0);
+        tunnel(SHORT, -EASY);
+        bumps(MID);
+        surface(SURF_DIRT);
+        curve(MEDIUM, HARD, LOW);
+        surface(SURF_ASPHALT);
+        sCurves(SHORT, HARD, -LOW);
+        curve(MEDIUM, -EASY);
         break;
     }
     surface(SURF_ASPHALT);
@@ -405,7 +586,7 @@ void Track::decorate(unsigned seed) {
         bool gantry = nearGantry(i);
         bool sign = false;
         for (auto& s : segs[i].sprites)
-            sign |= (s.type == SPR_TURN_LEFT || s.type == SPR_TURN_RIGHT || s.type >= SPR_SIGN_JUMP);
+            sign |= (s.type == SPR_TURN_LEFT || s.type == SPR_TURN_RIGHT || (s.type >= SPR_SIGN_JUMP && s.type <= SPR_SIGN_DIRT));
         if (segs[i].kerb == KERB_GUARDRAIL) sign = true;    // keep the rail side clear of close scenery
         if (!gantry && !sign && i % 120 == 60) add(i, SpriteType(billboards[bb++ % 3]), side() * rnd(1.9, 2.4));
         switch (stage) {
@@ -435,11 +616,45 @@ void Track::decorate(unsigned seed) {
             if (i % 4 == 0 && !gantry && !sign) add(i, SPR_PINE, side() * rnd(1.6, 2.1));
             if (chance(0.2)) add(i, SPR_BUSH, side() * rnd(1.6, 4.0));
             break;
-        default:
+        case 5:
             if (i % 10 == 0 && !gantry && !sign) { add(i, SPR_PALM, -1.65); add(i, SPR_PALM, 1.65); }
             if (i % 10 == 5 && !gantry && !sign) { add(i, SPR_LAMP, -1.35); add(i, SPR_LAMP, 1.35); }
             if (chance(0.1)) add(i, SPR_BUSH, side() * rnd(2.5, 5.0));
             if (i % 60 == 30 && !gantry && !sign) add(i, SpriteType(billboards[bb++ % 3]), side() * rnd(2.0, 2.4));
+            break;
+        case 6:   // future
+            if (i % 8 == 0 && !gantry && !sign) { add(i, SPR_HOLO_PYLON, -1.35); add(i + 4, SPR_HOLO_PYLON, 1.35); }
+            if (i % 6 == 0) add(i, SPR_SCIFI_TOWER, side() * rnd(3.0, 5.0));
+            if (chance(0.12)) add(i, SPR_SCIFI_TOWER, side() * rnd(5.5, 9.0));
+            if (i % 70 == 35) add(i, SPR_UFO, side() * rnd(2.2, 4.0));
+            if (i % 90 == 10 && !gantry && !sign) add(i, SPR_HOLO_SIGN, side() * rnd(1.9, 2.3));
+            break;
+        case 7:   // Rio
+            if (i % 7 == 0 && !gantry && !sign) { add(i, SPR_PALM, -1.65 - rnd(0, 0.3)); add(i + 3, SPR_PALM, 1.65 + rnd(0, 0.3)); }
+            if (chance(0.3)) add(i, SPR_TROPICAL, side() * rnd(2.0, 5.0));
+            if (i % 14 == 7 && !gantry && !sign) add(i, SPR_CARNIVAL, side() * 1.5);
+            if (i % 9 == 4) add(i, SPR_FAVELA, side() * rnd(3.2, 6.0));
+            if (chance(0.08)) add(i, SPR_FAVELA, side() * rnd(6.0, 9.0));
+            break;
+        case 8:   // Paris
+            if (i % 8 == 0 && !gantry && !sign) { add(i, SPR_PARIS_LAMP, -1.35); add(i + 4, SPR_PARIS_LAMP, 1.35); }
+            if (i % 8 == 2 && !gantry && !sign) { add(i, SPR_TREE_ROUND, -1.9); add(i + 4, SPR_TREE_ROUND, 1.9); }
+            if (i % 7 == 0) add(i, SPR_HAUSSMANN, side() * rnd(3.2, 4.4));
+            if (chance(0.05)) add(i, SPR_HAUSSMANN, side() * rnd(5.0, 8.0));
+            if (i % 30 == 15 && !gantry && !sign) add(i, SPR_CAFE, side() * 2.4);
+            break;
+        case 9:   // Germany
+            if (chance(0.35)) add(i, chance(0.6) ? SPR_PINE : SPR_TREE_ROUND, side() * rnd(2.2, 8.0));
+            if (i % 9 == 0 && !gantry && !sign) add(i, SPR_TREE_ROUND, side() * rnd(1.8, 2.2));
+            if (i % 40 == 20) add(i, SPR_FACHWERK, side() * rnd(3.5, 6.0));
+            if (i % 120 == 100 && !gantry && !sign) add(i, SPR_AUTOBAHN_SIGN, 1.7);
+            if (i % 55 == 30) add(i, SPR_WIND_TURBINE, side() * rnd(5.0, 9.0));
+            break;
+        default:  // 10 Florence
+            if (i % 5 == 0 && !gantry && !sign) { add(i, SPR_CYPRESS, -1.7 - rnd(0, 0.2)); add(i, SPR_CYPRESS, 1.7 + rnd(0, 0.2)); }
+            if (chance(0.25)) add(i, SPR_OLIVE, side() * rnd(2.4, 7.0));
+            if (chance(0.10)) add(i, SPR_CYPRESS, side() * rnd(3.0, 8.0));
+            if (i % 35 == 17) add(i, SPR_VILLA, side() * rnd(3.4, 6.0));
             break;
         }
     }

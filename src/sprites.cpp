@@ -21,4 +21,9 @@ const char* const SPRITE_NAMES[SPR_COUNT] = {
     "billboard1", "billboard2", "billboard3", "building1", "building2",
     "snowman", "turn_left", "turn_right", "gantry_start", "gantry_check",
     "sign_jump", "sign_narrow", "sign_tunnel", "sign_dirt",
+    "holo_pylon", "scifi_tower", "ufo", "holo_sign",
+    "tropical", "carnival", "favela",
+    "paris_lamp", "haussmann", "cafe", "tree_round",
+    "fachwerk", "autobahn_sign", "wind_turbine",
+    "cypress", "villa", "olive",
 };

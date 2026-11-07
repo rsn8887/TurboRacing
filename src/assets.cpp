@@ -203,6 +203,12 @@ const std::vector<Group>& groups() {
         {"props", {SPR_LAMP, SPR_BUILDING1, SPR_BUILDING2}},
         {"signs", {SPR_BILLBOARD1, SPR_BILLBOARD2, SPR_BILLBOARD3, SPR_TURN_LEFT, SPR_TURN_RIGHT, SPR_GANTRY_START,
                    SPR_GANTRY_CHECK, SPR_SIGN_JUMP, SPR_SIGN_NARROW, SPR_SIGN_TUNNEL, SPR_SIGN_DIRT}},
+        // stages 7-11
+        {"future", {SPR_HOLO_PYLON, SPR_SCIFI_TOWER, SPR_UFO, SPR_HOLO_SIGN}},
+        {"brazil", {SPR_TROPICAL, SPR_CARNIVAL, SPR_FAVELA}},
+        {"paris", {SPR_PARIS_LAMP, SPR_HAUSSMANN, SPR_CAFE, SPR_TREE_ROUND}},
+        {"germany", {SPR_FACHWERK, SPR_AUTOBAHN_SIGN, SPR_WIND_TURBINE}},
+        {"italy", {SPR_CYPRESS, SPR_VILLA, SPR_OLIVE}},
     };
     return g;
 }

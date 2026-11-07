@@ -70,6 +70,32 @@ inline double lightFrac(double z0, double z1, double len) {
     return std::clamp((F(z1) - F(z0)) / (z1 - z0), 0.0, 1.0);
 }
 
+// fraction of [z0,z1] that falls on the first 'on' units of each 'period' (thin lines across the ground)
+inline double dutyFrac(double z0, double z1, double period, double on) {
+    auto F = [=](double z) {
+        double n = std::floor(z / period);
+        return n * on + std::min(z - n * period, on);
+    };
+    if (z1 - z0 < 1e-3) return std::fmod(std::fmod(z0, period) + period, period) < on ? 1.0 : 0.0;
+    return std::clamp((F(z1) - F(z0)) / (z1 - z0), 0.0, 1.0);
+}
+
+// bright, fully saturated colour for a hue 0..1 (the rainbow road)
+inline Color hueColor(double h) {
+    h = (h - std::floor(h)) * 6;
+    int i = int(h);
+    double f = h - i;
+    auto C = [](double v) { return int(std::lround(60 + 195 * v)); };   // never darker than 60: bright pastel-neon
+    switch (i % 6) {
+    case 0:  return rgb(C(1), C(f), C(0));
+    case 1:  return rgb(C(1 - f), C(1), C(0));
+    case 2:  return rgb(C(0), C(1), C(f));
+    case 3:  return rgb(C(0), C(1 - f), C(1));
+    case 4:  return rgb(C(f), C(0), C(1));
+    default: return rgb(C(1), C(0), C(1 - f));
+    }
+}
+
 inline double tunnelDark(double z) { return std::min(0.75, 0.12 + 0.63 * (1 - std::exp(-z * 0.000045))); }
 // how much a car at track distance 'dist' is lit by the nearest row of tunnel lamps (0..1): a short bright
 // spell each time it passes under one
@@ -112,7 +138,20 @@ void drawRoadRow(Canvas& cv, const Rect& vp, const Theme& th, int y, double cx, 
         cv.span(vp.x, vp.x + vp.w, y, TUNNEL_BLACK);
         spanU(-TUNNEL_SIDE, TUNNEL_SIDE, F(LD(rgb(118, 116, 112), rgb(108, 106, 102))));   // concrete walkway
     } else {
-        cv.span(vp.x, vp.x + vp.w, y, F(LD(th.grassLight, th.grassDark)));
+        Color grass = LD(th.grassLight, th.grassDark);
+        cv.span(vp.x, vp.x + vp.w, y, F(grass));
+        if (th.grid) {                                      // glowing grid on the ground (future)
+            double across = dutyFrac(worldZ - span / 2, worldZ + span / 2, 1200, 90);
+            if (across > 0.01) cv.span(vp.x, vp.x + vp.w, y, F(lerpColor(grass, th.grid, 0.75 * across)));
+            Color line = F(lerpColor(grass, th.grid, 0.8));
+            const double gw = 0.035;                        // line width (road half widths)
+            for (int n = 0; n < 40; ++n) {
+                double u = 1.6 + n * 0.9;
+                if (cx - u * hw < vp.x && cx + u * hw > vp.x + vp.w) break;
+                spanU(-u - gw, -u + gw, line);
+                spanU(u - gw, u + gw, line);
+            }
+        }
     }
 
     // --- dirt road: ragged edges, ruts, grainy rows, no markings
@@ -155,7 +194,59 @@ void drawRoadRow(Canvas& cv, const Rect& vp, const Theme& th, int y, double cx, 
         spanU(-1 - 0.04 * k, 1 + 0.04 * k, F(shade(LD(th.grassLight, th.grassDark), 0.8)));
         break;
     }
-    spanU(-1.0, 1.0, road);
+    const double px = hw;                                    // screen pixels per road half width
+    switch (th.road) {
+    case ROAD_CHECKER: {                                     // square tiles: 8 across a standard road
+        const int cols = std::max(2, 2 * int(std::lround(4 * w)));
+        const double tile = 2 * ROAD_WIDTH * w / cols;
+        double rowF = lightFrac(worldZ - span / 2, worldZ + span / 2, tile);   // share of "even" rows
+        Color A = LD(th.roadLight, th.roadDark), B = th.roadAlt;
+        Color even = lerpColor(B, A, rowF), odd = lerpColor(A, B, rowF);
+        if (2 * px / cols < 1.5) { spanU(-1.0, 1.0, F(lerpColor(A, B, 0.5))); break; }   // too small: average
+        for (int i = 0; i < cols; ++i)
+            spanU(-1.0 + 2.0 * i / cols, -1.0 + 2.0 * (i + 1) / cols, F((i & 1) ? odd : even));
+        break;
+    }
+    case ROAD_RAINBOW: {                                     // wavy bands of colour flowing down the road
+        const int bands = 7;
+        const double flow = worldZ / 5200;
+        double fade = std::clamp((span - 300) / 900, 0.0, 1.0);      // far away the colours blend
+        Color avg = rgb(196, 160, 210);
+        double light = 0.9 + 0.1 * lf;
+        double edge[bands + 1];
+        for (int j = 0; j <= bands; ++j)
+            edge[j] = j == 0 ? -1.0 : j == bands ? 1.0
+                     : -1.0 + 2.0 * j / bands + 0.09 * std::sin(worldZ / 900 + j * 1.7);
+        if (2 * px / bands < 1.5) fade = 1;
+        for (int j = 0; j < bands; ++j) {
+            Color c = shade(hueColor(flow + j * 0.11 + 0.05 * std::sin(worldZ / 1300)), light);
+            spanU(edge[j], edge[j + 1], F(lerpColor(c, avg, fade)));
+        }
+        break;
+    }
+    case ROAD_COBBLE: {                                      // rows of stones, every other row shifted by half
+        const double SL = ROAD_WIDTH / 9;                    // stone length along the road
+        const int across = std::max(4, int(std::lround(16 * w)));
+        Color base = LD(th.roadLight, th.roadDark);
+        double joint = dutyFrac(worldZ - span / 2, worldZ + span / 2, SL, SL * 0.16) * detail;
+        spanU(-1.0, 1.0, F(lerpColor(base, th.roadAlt, 0.25 + 0.6 * joint)));
+        if (detail < 0.15 || 2 * px / across < 3) break;    // far away: just the averaged colour
+        double row = std::floor(worldZ / SL);
+        double shift = std::fmod(row, 2.0) != 0 ? 0.5 : 0.0;
+        double sw = 2.0 / across, gap = sw * 0.14;
+        for (int i = -1; i <= across; ++i) {
+            double u0 = -1.0 + (i + shift) * sw + gap / 2, u1 = u0 + sw - gap;
+            u0 = std::max(u0, -1.0); u1 = std::min(u1, 1.0);
+            if (u1 <= u0) continue;
+            double v = 0.88 + 0.24 * hashNoise(row * 3.1, i * 7.7);
+            spanU(u0, u1, F(lerpColor(lerpColor(base, th.roadAlt, 0.6 * joint), shade(base, v), detail)));
+        }
+        break;
+    }
+    default:
+        spanU(-1.0, 1.0, road);
+        break;
+    }
     // subtle darker edge on the asphalt next to the kerbs (fake ambient occlusion)
     spanU(-1.0, -1 + 0.03 * k, F(shade(road, 0.85)));
     spanU(1 - 0.03 * k, 1.0, F(shade(road, 0.85)));
@@ -665,7 +756,7 @@ void renderView(Canvas& cv, const Rect& vp, const Race& race, int carIndex, cons
                 if (si.type == SPR_GANTRY_START || si.type == SPR_GANTRY_CHECK) dw *= seg.w1;   // spans the road
                 double sx = p.x1 + sc * si.offset * ROAD_WIDTH * focal;
                 if (sx + dw / 2 < vp.x || sx - dw / 2 > vp.x + vp.w) continue;
-                bool flip = si.type == SPR_LAMP && si.offset > 0;
+                bool flip = SPRITE_INFO[si.type].mirrorRight && si.offset > 0;
                 cv.blitScaled(bmp, sx - dw / 2, p.y1 - dh, dw, dh, flip, p.clip, fog, th.fogColor);
             }
         }

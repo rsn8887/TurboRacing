@@ -1,5 +1,4 @@
 // Turbo Racing - a pseudo-3D arcade racer in the style of Outrun / Lotus Esprit Turbo Challenge
-// Written in C++/SDL2 by rsn8887.
 #include <SDL.h>
 #include <algorithm>
 #include <cmath>
@@ -626,6 +625,37 @@ struct App {
 
 } // namespace
 
+// test mode --pilot: drives player 1 like a good human would, through the normal controls (the clock runs):
+// a speed target from the perfect-driver profile (with some caution), steering against the centrifugal drift
+// back to the middle of its lane, and a sidestep around cars just ahead
+PlayerInput pilotInput(const Race& r, int idx, double caution) {
+    const Car& c = r.cars[size_t(idx)];
+    const Track& t = r.track;
+    PlayerInput in;
+    double target = 1e9;
+    for (double d = 0; d < 90 * SEG_LEN; d += SEG_LEN / 2) {
+        double cap = referenceCap(t, c.dist + d) * caution;
+        target = std::min(target, std::sqrt(cap * cap + 2 * BRAKE_DECEL * MAX_SPEED * d * 0.8));
+    }
+    in.throttle = c.speed < target ? 1 : 0;
+    in.brake = c.speed > target * 1.03 ? 1 : 0;
+    const Segment& s = t.find(c.dist);
+    const CarStats& st = CAR_STATS[c.type];
+    bool dirt = s.surface == SURF_DIRT;
+    double sp = c.speed / MAX_SPEED;
+    double drift = 2 * sp * sp * s.curve * CENTRIFUGAL * (dirt ? DIRT_SLIDE : 1.0) / st.grip;
+    double auth = 2 * std::min(1.0, sp * 1.8) * (dirt ? DIRT_GRIP : 1.0) * st.grip;
+    double w = t.widthAt(c.dist), xt = 0;
+    for (size_t k = 0; k < r.cars.size(); ++k) {
+        if (int(k) == idx) continue;
+        const Car& o = r.cars[k];
+        double dd = o.dist - c.dist;
+        if (dd > 0 && dd < 8 * SEG_LEN && std::fabs(o.x - c.x) < 0.7) xt = (o.x > 0 ? -0.55 : 0.55) * w;
+    }
+    in.steer = std::clamp((drift + 2.5 * (xt - c.x) - 0.3 * c.vx) / std::max(auth, 0.1), -1.0, 1.0);
+    return in;
+}
+
 int main(int argc, char** argv) {
 #ifdef __SWITCH__
     romfsInit();                             // the assets folder is packed into the .nro's romfs
@@ -635,6 +665,7 @@ int main(int argc, char** argv) {
     int shotStage = 0, shotPlayers = 1;
     double shotSeconds = 3;
     bool shotTitle = false, shotAuto = false, bench = false, info = false, carsheet = false;
+    double pilot = 0;   // --pilot <caution 0..1>: see pilotInput
     double telemetry = 0;
     int winW = 0, winH = 0;
     const char* audioTest = nullptr;      // debug: render the race sound into a WAV file
@@ -647,6 +678,7 @@ int main(int argc, char** argv) {
         else if (!std::strcmp(argv[i], "--players") && i + 1 < argc) shotPlayers = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--title")) shotTitle = true;
         else if (!std::strcmp(argv[i], "--auto")) shotAuto = true;
+        else if (!std::strcmp(argv[i], "--pilot") && i + 1 < argc) pilot = std::atof(argv[++i]);
         else if (!std::strcmp(argv[i], "--bench")) bench = true;
         else if (!std::strcmp(argv[i], "--audiotest") && i + 1 < argc) audioTest = argv[++i];
         else if (!std::strcmp(argv[i], "--time") && i + 1 < argc) timeLeft = std::atof(argv[++i]);
@@ -708,6 +740,13 @@ int main(int argc, char** argv) {
             if (info) {
                 const Track& t = app.race.track;
                 std::printf("stage %d: %d segments, checkpoint %d\n", shotStage, t.count(), int(t.checkpointZ / SEG_LEN));
+                {
+                    double vcp = 0, gridZ = -GRID_FRONT - (NUM_CARS - 1) * GRID_SLOT;
+                    double tA = referenceTime(t, gridZ, t.checkpointZ, 0, &vcp);
+                    double tB = referenceTime(t, t.checkpointZ, t.length, vcp);
+                    std::printf("  time limits: to checkpoint %.0f s (perfect %.1f s, x%.2f), checkpoint to finish %.0f s (perfect %.1f s, x%.2f)\n",
+                                app.race.legBonus(0) + 8, tA, (app.race.legBonus(0) + 8) / tA, app.race.legBonus(1), tB, app.race.legBonus(1) / tB);
+                }
                 for (int j : t.jumps_) std::printf("  jump crest %d\n", j);
                 for (int j : t.narrows_) std::printf("  narrows at %d\n", j);
                 for (int j : t.tunnels_) std::printf("  tunnel at %d\n", j);
@@ -733,7 +772,18 @@ int main(int argc, char** argv) {
                 Uint64 t0 = SDL_GetPerformanceCounter();
                 if (shotAuto && app.race.phase == RacePhase::Racing)
                     for (auto& c : app.race.cars) if (c.player >= 0 && !c.autopilot) { c.autopilot = true; c.skill = 0.97; }
+                int pIdx = pilot > 0 ? app.race.humanCar(0) : -1;
+                int cpBefore = pIdx >= 0 ? app.race.cars[size_t(pIdx)].cpPassed : 0;
+                double leftBefore = pIdx >= 0 ? app.race.cars[size_t(pIdx)].timeLeft : 0;
+                if (pIdx >= 0) { input.overrideOn = true; input.overrideIn = pilotInput(app.race, pIdx, pilot); }
                 app.tick(STEP);
+                if (pIdx >= 0) {
+                    const Car& c = app.race.cars[size_t(pIdx)];
+                    if (c.cpPassed > cpBefore && c.cpPassed > 0)
+                        std::printf("pilot: %s %d at t=%.1f s with %.1f s left\n", c.cpPassed % 2 ? "checkpoint" : "lap", (c.cpPassed + 1) / 2, i * STEP, leftBefore);
+                    if (c.timedOut && !c.finished) { std::printf("pilot: TIMED OUT at t=%.1f s (half-laps %d)\n", i * STEP, c.cpPassed); break; }
+                    if (c.finished) { std::printf("pilot: finished at t=%.1f s\n", i * STEP); break; }
+                }
                 if (bench) app.render();
                 frameMs.push_back((SDL_GetPerformanceCounter() - t0) * 1000.0 / SDL_GetPerformanceFrequency());
                 if (telemetry > 0 && i % std::max(1, int(telemetry * 60)) == 0) {   // debug: player car log

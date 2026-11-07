@@ -4,7 +4,7 @@
 
 #define GAME_TITLE   "Turbo Racing"
 #ifndef GAME_VERSION
-#define GAME_VERSION "1.1.0"     // set by CMake from project(... VERSION)
+#define GAME_VERSION "1.2.0"     // set by CMake from project(... VERSION)
 #endif
 
 // Internal framebuffer (16:9, scales 2x to 720p and 3x to 1080p)
@@ -60,6 +60,10 @@ constexpr double OVERSPEED     = 1.15;    // downhill you can go this much faste
 constexpr double GRAVITY       = 6000.0;  // free fall in world units / s^2: jumps hang ~1 s on smooth parabolas
 constexpr double TAKEOFF_ACCEL = GRAVITY * 4.5;   // suspension + downforce keep you on the road over gentle crests
 constexpr int    NUM_GEARS     = 5;
+// time limits: this much longer than a perfect driver needs (the first leg, with the standing start from the back
+// of the grid and the traffic, gets more)
+constexpr double TIME_SLACK_START = 1.28;
+constexpr double TIME_SLACK       = 1.15;
 
 constexpr int    NUM_CARS      = 20;      // grid size (players + AI)
 // staggered starting grid: consecutive cars alternate left/right and are GRID_SLOT apart, so every car has

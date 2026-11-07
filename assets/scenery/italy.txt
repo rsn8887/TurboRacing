@@ -1,0 +1,4 @@
+# scenery atlas: name  x y w h
+cypress  1 1 88 364
+villa  90 1 316 288
+olive  407 1 188 144

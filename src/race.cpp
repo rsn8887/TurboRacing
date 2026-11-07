@@ -54,6 +54,47 @@ static double carAccel(const CarStats& st, double u, double power, bool dirt, bo
     return a;
 }
 
+// Highest speed (world units / s) the sport car can hold at track distance z: the top speed, the cornering
+// limit (steering grip just holds the line against the centrifugal drift: 2 grip = 2 sp^2 curve C slide / grip)
+// and the top speed on dirt.
+double referenceCap(const Track& track, double z) {
+    const CarStats& st = CAR_STATS[0];
+    const Segment& s = track.find(z);
+    bool dirt = s.surface == SURF_DIRT;
+    double c = st.top;
+    if (std::fabs(s.curve) > 0.05) {
+        double g = (dirt ? DIRT_GRIP : 1.0) * st.grip, slide = dirt ? DIRT_SLIDE : 1.0;
+        c = std::min(c, 0.95 * g / std::sqrt(CENTRIFUGAL * std::fabs(s.curve) * slide));
+    }
+    if (dirt) c = std::min(c, st.dirtTop * st.top);
+    return c * MAX_SPEED;
+}
+
+// Time a perfect driver in the sport car needs from z0 to z1 (track distance, may be negative = on the grid),
+// starting at speed v0 (world units / s): full throttle, braking just in time for bends, at the cornering limit
+// (steering grip against the centrifugal drift), the top speed on dirt and the real acceleration up and down
+// hills. Returns the time; vEnd gets the speed at z1.
+double referenceTime(const Track& track, double z0, double z1, double v0, double* vEnd) {
+    const CarStats& st = CAR_STATS[0];
+    const double dz = SEG_LEN / 2;
+    const int n = std::max(1, int(std::ceil((z1 - z0) / dz)));
+    std::vector<double> cap(size_t(n) + 1), v(size_t(n) + 1);
+    for (int i = 0; i <= n; ++i) cap[size_t(i)] = referenceCap(track, z0 + i * dz);
+    v[0] = std::min(v0, cap[0]);
+    for (int i = 0; i < n; ++i) {                                 // accelerate as hard as the car can
+        double z = z0 + i * dz, vi = std::max(v[size_t(i)], 50.0);
+        const Segment& s = track.find(z);
+        double a = carAccel(st, vi / MAX_SPEED, 1.0, s.surface == SURF_DIRT, false, track.groundSlope(z)) * MAX_SPEED;
+        v[size_t(i) + 1] = std::min(cap[size_t(i) + 1], std::sqrt(std::max(0.0, vi * vi + 2 * a * dz)));
+    }
+    for (int i = n - 1; i >= 0; --i)                              // brake just in time
+        v[size_t(i)] = std::min(v[size_t(i)], std::sqrt(v[size_t(i) + 1] * v[size_t(i) + 1] + 2 * BRAKE_DECEL * MAX_SPEED * dz));
+    double t = 0;
+    for (int i = 0; i < n; ++i) t += dz / std::max(50.0, 0.5 * (v[size_t(i)] + v[size_t(i) + 1]));
+    if (vEnd) *vEnd = v[size_t(n)];
+    return t;
+}
+
 std::vector<Driver> makeDrivers(int players) {
     std::vector<Driver> d;
     for (int p = 0; p < players; ++p) {
@@ -98,9 +139,14 @@ void Race::start(int stage, const std::vector<Driver>& drivers, const Options& o
     std::sort(grid.begin(), grid.end(), [&](int a, int b) { return drivers[a].skill > drivers[b].skill; });
     for (int i = 0; i < int(drivers.size()); ++i) if (drivers[i].player >= 0) grid.push_back(i);
 
-    double avg = 0.74 + 0.010 * stage;
-    bonusA_ = std::round(track.checkpointZ / (MAX_SPEED * avg));
-    bonusB_ = std::round((track.length - track.checkpointZ) / (MAX_SPEED * avg));
+    {   // time limits: from the time a perfect driver needs on this very track (bends, gravel, hills), plus slack for
+        // traffic and mistakes; the first leg includes the standing start from the back of the grid
+        double vcp = 0, gridZ = -GRID_FRONT - (NUM_CARS - 1) * GRID_SLOT;
+        double tA = referenceTime(track, gridZ, track.checkpointZ, 0, &vcp);
+        double tB = referenceTime(track, track.checkpointZ, track.length, vcp);
+        bonusA_ = std::round(tA * TIME_SLACK_START) - 8;   // the clock starts at bonusA_ + 8
+        bonusB_ = std::round(tB * TIME_SLACK);
+    }
     humans = 0;
     for (int g = 0; g < int(grid.size()); ++g) {
         const Driver& d = drivers[grid[g]];

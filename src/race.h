@@ -101,3 +101,6 @@ private:
 extern const int POINTS[10];
 std::vector<Driver> makeDrivers(int players);
 double gearTop(int g);
+// time a perfect driver needs from z0 to z1 (see race.cpp); sets the time limits
+double referenceTime(const Track& track, double z0, double z1, double v0, double* vEnd = nullptr);
+double referenceCap(const Track& track, double z);

@@ -1,0 +1,5 @@
+# scenery atlas: name  x y w h
+paris_lamp  270 1 152 404
+haussmann  1 1 268 480
+cafe  632 1 312 188
+tree_round  423 1 208 304

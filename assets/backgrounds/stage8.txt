@@ -1,0 +1,4 @@
+# background layers of RIO CARNIVAL, back to front: layer  x y w h  parallax  yOffset
+layer  1 262 2048 204  0.03 -40
+layer  1 1 2048 260  0.08 0
+layer  1 467 2048 140  0.18 0
