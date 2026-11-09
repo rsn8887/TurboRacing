@@ -1,4 +1,4 @@
-# Build environment for the Android version of Turbo Racing: JDK 17, the Android SDK and NDK, Gradle,
+# Build environment for the Android version of Turbo Racing Mayhem: JDK 17, the Android SDK and NDK, Gradle,
 # and the SDL2 / SDL2_ttf sources. See README.md (Android) for how to use it.
 # The Android build tools only exist for x86-64 Linux: on Apple Silicon, Docker runs this image emulated.
 FROM eclipse-temurin:17-jdk-jammy
@@ -30,6 +30,6 @@ RUN git clone -q --depth 1 -b release-2.32.10 https://github.com/libsdl-org/SDL.
 ENV SDL2_SOURCE_DIR=/opt/SDL2
 ENV SDL2_TTF_SOURCE_DIR=/opt/SDL2_ttf
 
-# the folder that contains TurboRacing/ is mounted at /work; the APK lands in /work/build-android
+# the folder that contains TurboRacingMayhem/ is mounted at /work; the APK lands in /work/build-android
 WORKDIR /work
-CMD ["sh", "/work/TurboRacing/android/build.sh"]
+CMD ["sh", "/work/TurboRacingMayhem/android/build.sh"]

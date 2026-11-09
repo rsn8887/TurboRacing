@@ -1,4 +1,4 @@
-// Turbo Racing - a pseudo-3D arcade racer in the style of Outrun / Lotus Esprit Turbo Challenge
+// Turbo Racing Mayhem - a pseudo-3D arcade racer in the style of Outrun / Lotus Esprit Turbo Challenge
 #include <SDL.h>
 #include <algorithm>
 #include <cmath>
@@ -368,10 +368,10 @@ struct App {
     }
 
     void drawLogo(double y) {
-        TextStyle st = styleDisplay(46, rgb(255, 250, 150), rgb(240, 40, 70));
+        TextStyle st = styleDisplay(38, rgb(255, 250, 150), rgb(240, 40, 70));
         st.outline = rgb(30, 8, 40);
         st.outlineW = 2.5;
-        text.draw("TURBO RACING", SCREEN_W / 2.0, y, st, ALIGN_CENTER);
+        text.draw("TURBO RACING MAYHEM", SCREEN_W / 2.0, y + 6, st, ALIGN_CENTER);
     }
 
     void renderTitle() {

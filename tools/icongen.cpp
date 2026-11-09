@@ -1,9 +1,9 @@
-// App icons for Turbo Racing, painted by the asset tool:  turbo_assetgen --icons <folder>
+// App icons for Turbo Racing Mayhem, painted by the asset tool:  turbo_assetgen --icons <folder>
 //
 //   icon.png         1024x1024 master, square, no transparency
 //   icon_switch.jpg  256x256 JPEG for the Switch homebrew menu (nx_create_nro ICON)
 //   icon_macos.png   1024x1024 with the rounded macOS shape and margin
-//   TurboRacing.icns the macOS app icon (all sizes, built from icon_macos.png)
+//   TurboRacingMayhem.icns the macOS app icon (all sizes, built from icon_macos.png)
 //   android/mipmap-*/ic_launcher.png             Android launcher icons (the macOS shape, for older launchers)
 //   android/mipmap-*/ic_launcher_foreground.png  the foreground of the adaptive icon (Android 8+): the rounded
 //                                                icon inside the safe zone; the background colour is in the app
@@ -218,7 +218,7 @@ bool generateIcons(const std::string& dir, std::string& err) {
     auto rgb3 = rgbaBytes(sw, true);
     if (!stbi_write_jpg((dir + "/icon_switch.jpg").c_str(), sw.w, sw.h, 3, rgb3.data(), 95)) return fail("icon_switch.jpg");
     if (!writeFile(dir + "/icon_macos.png", pngBytes(mac))) return fail("icon_macos.png");
-    if (!writeIcns(dir + "/TurboRacing.icns", mac)) return fail("TurboRacing.icns");
+    if (!writeIcns(dir + "/TurboRacingMayhem.icns", mac)) return fail("TurboRacingMayhem.icns");
     // Android: five densities; the adaptive icon is 108 dp, of which the launcher shows at least the middle 66 dp
     struct D { const char* name; int legacy, adaptive; };
     const D dens[] = {{"mdpi", 48, 108}, {"hdpi", 72, 162}, {"xhdpi", 96, 216}, {"xxhdpi", 144, 324}, {"xxxhdpi", 192, 432}};

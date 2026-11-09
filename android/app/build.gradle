@@ -2,10 +2,10 @@ plugins {
     id 'com.android.application'
 }
 
-// The version comes from project(TurboRacing VERSION x.y.z) in CMakeLists.txt, like on the other platforms.
+// The version comes from project(TurboRacingMayhem VERSION x.y.z) in CMakeLists.txt, like on the other platforms.
 def outDir = rootProject.ext.outDir
 def cmakeLists = file("${rootDir}/../CMakeLists.txt")
-def v = (cmakeLists.text =~ /project\(TurboRacing VERSION (\d+)\.(\d+)\.(\d+)/)
+def v = (cmakeLists.text =~ /project\(TurboRacingMayhem VERSION (\d+)\.(\d+)\.(\d+)/)
 if (!v.find()) throw new GradleException("no version in CMakeLists.txt")
 def versionString = "${v.group(1)}.${v.group(2)}.${v.group(3)}"
 def versionNumber = v.group(1).toInteger() * 10000 + v.group(2).toInteger() * 100 + v.group(3).toInteger()

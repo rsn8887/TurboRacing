@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds Turbo Racing for macOS and packs it into a .dmg (drag the app to Applications).
+# Builds Turbo Racing Mayhem for macOS and packs it into a .dmg (drag the app to Applications).
 #
 #   ./make_dmg.sh [build folder]      default: build-macos next to the project folder
 #
@@ -12,17 +12,17 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 BUILD="${1:-$ROOT/../build-macos}"
 mkdir -p "$BUILD"
 BUILD="$(cd "$BUILD" && pwd)"
-VERSION="$(sed -n 's/^project(TurboRacing VERSION \([0-9.]*\).*/\1/p' "$ROOT/CMakeLists.txt")"
-APP="$BUILD/TurboRacing.app"
-DMG="$BUILD/TurboRacing-$VERSION-macOS-$(uname -m).dmg"
+VERSION="$(sed -n 's/^project(TurboRacingMayhem VERSION \([0-9.]*\).*/\1/p' "$ROOT/CMakeLists.txt")"
+APP="$BUILD/TurboRacingMayhem.app"
+DMG="$BUILD/TurboRacingMayhem-$VERSION-macOS-$(uname -m).dmg"
 
 echo "== building in $BUILD"
 cmake -S "$ROOT" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release
-cmake --build "$BUILD" --target turboracing copy_assets -j "$(sysctl -n hw.ncpu)"
+cmake --build "$BUILD" --target turboracingmayhem copy_assets -j "$(sysctl -n hw.ncpu)"
 
 echo "== copying libraries into the app"
 FW="$APP/Contents/Frameworks"
-EXE="$APP/Contents/MacOS/TurboRacing"
+EXE="$APP/Contents/MacOS/TurboRacingMayhem"
 rm -rf "$FW"
 mkdir -p "$FW"
 
@@ -85,8 +85,8 @@ echo "== making $DMG"
 STAGE="$BUILD/dmg"
 rm -rf "$STAGE" "$DMG"
 mkdir -p "$STAGE"
-cp -R "$APP" "$STAGE/Turbo Racing.app"
+cp -R "$APP" "$STAGE/Turbo Racing Mayhem.app"
 ln -s /Applications "$STAGE/Applications"
-hdiutil create -volname "Turbo Racing" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+hdiutil create -volname "Turbo Racing Mayhem" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
 rm -rf "$STAGE"
 echo "done: $DMG"

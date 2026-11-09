@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(TurboRacing VERSION 1.2.0 LANGUAGES CXX)
+project(TurboRacingMayhem VERSION 1.2.0 LANGUAGES CXX)
 add_compile_definitions(GAME_VERSION="${PROJECT_VERSION}")
 
 set(CMAKE_CXX_STANDARD 17)
@@ -32,16 +32,16 @@ if(PLATFORM STREQUAL "SWITCH")
   #   cmake -B build-switch -DPLATFORM=SWITCH -DCMAKE_TOOLCHAIN_FILE=$DEVKITPRO/cmake/Switch.cmake
   find_package(PkgConfig REQUIRED)
   pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET SDL2_ttf sdl2)
-  add_executable(turboracing ${SOURCES})
-  target_include_directories(turboracing PRIVATE ${CMAKE_BINARY_DIR}/generated ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/third_party/stb)
-  target_compile_definitions(turboracing PRIVATE TURBO_RENDER_SCALE=${TURBO_RENDER_SCALE})
-  target_compile_options(turboracing PRIVATE -O3 -ffunction-sections)
-  target_link_libraries(turboracing PRIVATE PkgConfig::SDL2)
+  add_executable(turboracingmayhem ${SOURCES})
+  target_include_directories(turboracingmayhem PRIVATE ${CMAKE_BINARY_DIR}/generated ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/third_party/stb)
+  target_compile_definitions(turboracingmayhem PRIVATE TURBO_RENDER_SCALE=${TURBO_RENDER_SCALE})
+  target_compile_options(turboracingmayhem PRIVATE -O3 -ffunction-sections)
+  target_link_libraries(turboracingmayhem PRIVATE PkgConfig::SDL2)
   # the assets folder goes into the .nro's romfs (read as romfs:/assets)
   file(REMOVE_RECURSE ${CMAKE_BINARY_DIR}/romfs)
   file(COPY ${CMAKE_SOURCE_DIR}/assets DESTINATION ${CMAKE_BINARY_DIR}/romfs)
-  nx_generate_nacp(turboracing.nacp NAME "Turbo Racing" AUTHOR "rsn8887" VERSION ${PROJECT_VERSION})
-  nx_create_nro(turboracing NACP turboracing.nacp ICON ${CMAKE_SOURCE_DIR}/icon/icon_switch.jpg ROMFS ${CMAKE_BINARY_DIR}/romfs)
+  nx_generate_nacp(turboracingmayhem.nacp NAME "Turbo Racing Mayhem" AUTHOR "rsn8887" VERSION ${PROJECT_VERSION})
+  nx_create_nro(turboracingmayhem NACP turboracingmayhem.nacp ICON ${CMAKE_SOURCE_DIR}/icon/icon_switch.jpg ROMFS ${CMAKE_BINARY_DIR}/romfs)
 elseif(ANDROID)
   # Android: configured by Gradle (see android/), which passes the SDL2 and SDL2_ttf source trees. SDL's Java
   # activity loads libSDL2.so and the game, libmain.so; SDL2_ttf (with its bundled FreeType) is linked in statically.
@@ -75,28 +75,28 @@ else()
   find_package(SDL2 REQUIRED)
   find_package(Threads REQUIRED)
   if(APPLE)
-    # macOS: the game is an app bundle (TurboRacing.app) with its icon and the assets in Contents/Resources
-    set(ICNS ${CMAKE_SOURCE_DIR}/icon/TurboRacing.icns)
+    # macOS: the game is an app bundle (TurboRacingMayhem.app) with its icon and the assets in Contents/Resources
+    set(ICNS ${CMAKE_SOURCE_DIR}/icon/TurboRacingMayhem.icns)
     set_source_files_properties(${ICNS} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-    add_executable(turboracing MACOSX_BUNDLE ${SOURCES} ${ICNS})
-    set_target_properties(turboracing PROPERTIES
-      OUTPUT_NAME TurboRacing
+    add_executable(turboracingmayhem MACOSX_BUNDLE ${SOURCES} ${ICNS})
+    set_target_properties(turboracingmayhem PROPERTIES
+      OUTPUT_NAME TurboRacingMayhem
       MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/cmake/Info.plist.in
-      MACOSX_BUNDLE_BUNDLE_NAME "Turbo Racing"
-      MACOSX_BUNDLE_GUI_IDENTIFIER com.rsn8887.turboracing
-      MACOSX_BUNDLE_ICON_FILE TurboRacing.icns
+      MACOSX_BUNDLE_BUNDLE_NAME "Turbo Racing Mayhem"
+      MACOSX_BUNDLE_GUI_IDENTIFIER com.rsn8887.turboracingmayhem
+      MACOSX_BUNDLE_ICON_FILE TurboRacingMayhem.icns
       MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
       MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
       MACOSX_BUNDLE_COPYRIGHT "rsn8887")
     # room in the header so make_dmg.sh can point the library references into the app
-    target_link_options(turboracing PRIVATE -Wl,-headerpad_max_install_names)
-    set(ASSETS_DEST $<TARGET_BUNDLE_CONTENT_DIR:turboracing>/Resources/assets)
+    target_link_options(turboracingmayhem PRIVATE -Wl,-headerpad_max_install_names)
+    set(ASSETS_DEST $<TARGET_BUNDLE_CONTENT_DIR:turboracingmayhem>/Resources/assets)
   else()
-    add_executable(turboracing ${SOURCES})
-    set(ASSETS_DEST $<TARGET_FILE_DIR:turboracing>/assets)
+    add_executable(turboracingmayhem ${SOURCES})
+    set(ASSETS_DEST $<TARGET_FILE_DIR:turboracingmayhem>/assets)
   endif()
   add_executable(turbo_assetgen ${TOOL_SOURCES})
-  set(GAME_TARGETS turboracing turbo_assetgen)
+  set(GAME_TARGETS turboracingmayhem turbo_assetgen)
   find_package(SDL2_ttf CONFIG QUIET)
   if(NOT TARGET SDL2_ttf::SDL2_ttf AND NOT TARGET SDL2_ttf::SDL2_ttf-static)
     find_package(PkgConfig REQUIRED)
@@ -137,6 +137,6 @@ else()
   add_custom_target(icons COMMAND turbo_assetgen --icons ${CMAKE_SOURCE_DIR}/icon DEPENDS turbo_assetgen
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} COMMENT "Painting the app icons into icon/")
   if(WIN32)
-    set_target_properties(turboracing PROPERTIES WIN32_EXECUTABLE ON)
+    set_target_properties(turboracingmayhem PROPERTIES WIN32_EXECUTABLE ON)
   endif()
 endif()

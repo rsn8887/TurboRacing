@@ -1,4 +1,4 @@
-// turbo_assetgen: paints all of Turbo Racing's graphics procedurally (scenery, effects, backgrounds, and the
+// turbo_assetgen: paints all of Turbo Racing Mayhem's graphics procedurally (scenery, effects, backgrounds, and the
 // 3D-rendered cars) and writes them as PNG texture atlases + layout text files into an assets folder.
 //
 //   turbo_assetgen [output folder]        (default: assets)

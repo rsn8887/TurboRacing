@@ -1,8 +1,8 @@
-// Turbo Racing - pseudo-3D arcade racer in C++/SDL2
+// Turbo Racing Mayhem - pseudo-3D arcade racer in C++/SDL2
 #pragma once
 #include <cstdint>
 
-#define GAME_TITLE   "Turbo Racing"
+#define GAME_TITLE   "Turbo Racing Mayhem"
 #ifndef GAME_VERSION
 #define GAME_VERSION "1.2.0"     // set by CMake from project(... VERSION)
 #endif
