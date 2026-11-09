@@ -12,6 +12,7 @@ struct PlayerInput {
 
 struct MenuInput {
     bool up = false, down = false, left = false, right = false, confirm = false, back = false, pause = false;
+    bool background = false;   // the app is going to the background (Android: home button, screen off)
 };
 
 class Input {

@@ -53,9 +53,26 @@ bool writePng(const std::string& path, const Bitmap& b) {
 bool writeGreyPng(const std::string& path, int w, int h, const std::vector<unsigned char>& v) {
     return stbi_write_png(path.c_str(), w, h, 1, v.data(), w) != 0;
 }
+// the whole file, read through SDL: works for plain files, the Switch romfs and the assets inside an Android APK
+bool readFile(const std::string& path, std::vector<unsigned char>& out) {
+    SDL_RWops* f = SDL_RWFromFile(path.c_str(), "rb");
+    if (!f) return false;
+    out.clear();
+    unsigned char buf[65536];
+    size_t got;
+    while ((got = SDL_RWread(f, buf, 1, sizeof(buf))) > 0) out.insert(out.end(), buf, buf + got);
+    SDL_RWclose(f);
+    return true;
+}
+unsigned char* loadImage(const std::string& path, int& w, int& h, int channels) {
+    std::vector<unsigned char> file;
+    if (!readFile(path, file) || file.empty()) return nullptr;
+    int n = 0;
+    return stbi_load_from_memory(file.data(), int(file.size()), &w, &h, &n, channels);
+}
 bool readPng(const std::string& path, Bitmap& out) {
-    int w = 0, h = 0, n = 0;
-    unsigned char* d = stbi_load(path.c_str(), &w, &h, &n, 4);
+    int w = 0, h = 0;
+    unsigned char* d = loadImage(path, w, h, 4);
     if (!d) return false;
     out = Bitmap(w, h);
     for (size_t i = 0; i < out.px.size(); ++i)
@@ -64,8 +81,7 @@ bool readPng(const std::string& path, Bitmap& out) {
     return true;
 }
 bool readGreyPng(const std::string& path, int& w, int& h, std::vector<unsigned char>& out) {
-    int n = 0;
-    unsigned char* d = stbi_load(path.c_str(), &w, &h, &n, 1);
+    unsigned char* d = loadImage(path, w, h, 1);
     if (!d) return false;
     out.assign(d, d + size_t(w) * h);
     stbi_image_free(d);
@@ -142,7 +158,9 @@ bool writeAtlas(const std::string& base, const std::string& title, const std::ve
 // read "<name...> x y w h [more]" lines; '#' starts a comment
 std::vector<std::vector<std::string>> readLines(const std::string& path) {
     std::vector<std::vector<std::string>> out;
-    std::ifstream f(path);
+    std::vector<unsigned char> file;
+    readFile(path, file);
+    std::istringstream f(std::string(file.begin(), file.end()));
     std::string line;
     while (std::getline(f, line)) {
         if (auto c = line.find('#'); c != std::string::npos) line.resize(c);
@@ -187,6 +205,9 @@ bool makeDir(const std::string& d) {
     return true;
 #endif
 }
+// a file in the assets folder; an empty folder means the root of the APK's assets (Android)
+std::string inDir(const std::string& dir, const std::string& rel) { return dir.empty() ? rel : dir + "/" + rel; }
+
 bool exists(const std::string& p) {
     SDL_RWops* f = SDL_RWFromFile(p.c_str(), "rb");
     if (!f) return false;
@@ -221,19 +242,19 @@ Bitmap* effect(Graphics& g, int i) {
 // ================================================================= save ====
 bool saveAssets(const std::string& dir, const Graphics& g0, const CarSprites cars[CAR_TYPES], std::string& err) {
     Graphics& g = const_cast<Graphics&>(g0);    // only read
-    if (!makeDir(dir + "/scenery") || !makeDir(dir + "/backgrounds") || !makeDir(dir + "/cars")) {
+    if (!makeDir(inDir(dir, "scenery")) || !makeDir(inDir(dir, "backgrounds")) || !makeDir(inDir(dir, "cars"))) {
         err = "cannot create folders in " + dir;
         return false;
     }
     for (const Group& gr : groups()) {
         std::vector<Item> items;
         for (SpriteType t : gr.sprites) items.push_back({SPRITE_NAMES[t], &g.sprite[t]});
-        if (!writeAtlas(dir + "/scenery/" + gr.file, std::string("scenery atlas: name  x y w h"), items, {}, 2048, err)) return false;
+        if (!writeAtlas(inDir(dir, "scenery/") + gr.file, std::string("scenery atlas: name  x y w h"), items, {}, 2048, err)) return false;
     }
     {
         std::vector<Item> items;
         for (int i = 0; i < 7; ++i) items.push_back({EFFECT_NAMES[i], effect(g, i)});
-        if (!writeAtlas(dir + "/effects", "effects atlas: name  x y w h", items, {}, 1024, err)) return false;
+        if (!writeAtlas(inDir(dir, "effects"), "effects atlas: name  x y w h", items, {}, 1024, err)) return false;
     }
     for (int st = 0; st < NUM_STAGES; ++st) {
         std::vector<Item> items;
@@ -241,7 +262,7 @@ bool saveAssets(const std::string& dir, const Graphics& g0, const CarSprites car
         for (size_t i = 0; i < L.size(); ++i) items.push_back({"layer", &L[i].bmp});
         // one layer per row, back to front; each layer spans 1024 layout units, whatever its pixel width
         auto suffix = [&](size_t i) { return num(L[i].parallax) + " " + num(L[i].yOff); };
-        if (!writeAtlas(dir + "/backgrounds/stage" + std::to_string(st + 1),
+        if (!writeAtlas(inDir(dir, "backgrounds/stage") + std::to_string(st + 1),
                         std::string("background layers of ") + STAGE_NAMES[st] + ", back to front: layer  x y w h  parallax  yOffset",
                         items, {}, 1, err, suffix))
             return false;
@@ -269,7 +290,7 @@ bool saveAssets(const std::string& dir, const Graphics& g0, const CarSprites car
             std::string sc = num(f.scale);
             return std::to_string(f.ox) + " " + std::to_string(f.oy) + " " + sc;
         };
-        std::string base = dir + "/cars/" + CAR_FILE[t];
+        std::string base = inDir(dir, "cars/") + CAR_FILE[t];
         std::vector<std::string> extra = {
             "# frame <w> <h>: size of a whole frame; the car stands with its rear wheels on row " + std::to_string(CAR_ANCHOR_Y) +
                 " (at full size)",
@@ -304,10 +325,10 @@ bool loadAssets(const std::string& dir, Graphics& g, std::string& err) {
     auto fail = [&](const std::string& m) { err = m; return false; };
     // which resolution were the assets made for? (backgrounds are 1024 layout units wide)
     g_shrink = 1;
-    for (auto& l : readLines(dir + "/backgrounds/stage1.txt"))
+    for (auto& l : readLines(inDir(dir, "backgrounds/stage1.txt")))
         if (l[0] == "layer" && l.size() >= 5) { g_shrink = std::max(1, std::stoi(l[3]) / 1024 / RENDER_SCALE); break; }
     for (const Group& gr : groups()) {
-        std::string base = dir + "/scenery/" + gr.file;
+        std::string base = inDir(dir, "scenery/") + gr.file;
         Bitmap atlas;
         if (!readPng(base + ".png", atlas)) return fail("missing or unreadable " + base + ".png");
         for (auto& l : readLines(base + ".txt")) {
@@ -320,11 +341,11 @@ bool loadAssets(const std::string& dir, Graphics& g, std::string& err) {
         }
     }
     for (int t = 0; t < SPR_COUNT; ++t)
-        if (g.sprite[t].w == 0) return fail(std::string("sprite '") + SPRITE_NAMES[t] + "' not found in " + dir + "/scenery");
+        if (g.sprite[t].w == 0) return fail(std::string("sprite '") + SPRITE_NAMES[t] + "' not found in " + inDir(dir, "scenery"));
     {
         Bitmap atlas;
-        if (!readPng(dir + "/effects.png", atlas)) return fail("missing or unreadable " + dir + "/effects.png");
-        for (auto& l : readLines(dir + "/effects.txt"))
+        if (!readPng(inDir(dir, "effects.png"), atlas)) return fail("missing or unreadable " + inDir(dir, "effects.png"));
+        for (auto& l : readLines(inDir(dir, "effects.txt")))
             for (int i = 0; i < 7; ++i)
                 if (l.size() >= 5 && l[0] == EFFECT_NAMES[i]) {
                     *effect(g, i) = cutOut(atlas, std::stoi(l[1]), std::stoi(l[2]), std::stoi(l[3]), std::stoi(l[4]));
@@ -334,7 +355,7 @@ bool loadAssets(const std::string& dir, Graphics& g, std::string& err) {
             if (effect(g, i)->w == 0) return fail(std::string("effect '") + EFFECT_NAMES[i] + "' not found in effects.txt");
     }
     for (int st = 0; st < NUM_STAGES; ++st) {
-        std::string base = dir + "/backgrounds/stage" + std::to_string(st + 1);
+        std::string base = inDir(dir, "backgrounds/stage") + std::to_string(st + 1);
         Bitmap atlas;
         if (!readPng(base + ".png", atlas)) return fail("missing or unreadable " + base + ".png");
         g.bg[st].clear();
@@ -346,7 +367,7 @@ bool loadAssets(const std::string& dir, Graphics& g, std::string& err) {
         }
     }
     for (int t = 0; t < CAR_TYPES; ++t) {
-        std::string base = dir + "/cars/" + CAR_FILE[t];
+        std::string base = inDir(dir, "cars/") + CAR_FILE[t];
         Bitmap atlas;
         if (!readPng(base + ".png", atlas)) return fail("missing or unreadable " + base + ".png");
         int mw = 0, mh = 0;
@@ -396,6 +417,9 @@ std::string findAssetsDir() {
 #if defined(__SWITCH__)
     tries.push_back("romfs:/assets");
 #endif
+#if defined(__ANDROID__)
+    tries.push_back("");                              // packed into the APK as its assets (see android/)
+#endif
     if (char* b = SDL_GetBasePath()) {
         std::string base = b;
         SDL_free(b);
@@ -405,6 +429,6 @@ std::string findAssetsDir() {
     }
     tries.push_back("assets");
     for (auto& d : tries)
-        if (exists(d + "/effects.png")) return d;
+        if (exists(inDir(d, "effects.png"))) return d;
     return tries.empty() ? "assets" : tries.back();
 }

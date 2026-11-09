@@ -29,6 +29,7 @@ int Input::padPlayer(SDL_JoystickID id, int numPlayers) const {
 void Input::handleEvent(const SDL_Event& e, int numPlayers) {
     switch (e.type) {
     case SDL_QUIT: quitRequested = true; break;
+    case SDL_APP_WILLENTERBACKGROUND: menu.background = true; break;
     case SDL_CONTROLLERDEVICEADDED:
     case SDL_CONTROLLERDEVICEREMOVED: openAll(); break;
     case SDL_KEYDOWN: {
@@ -47,8 +48,8 @@ void Input::handleEvent(const SDL_Event& e, int numPlayers) {
         if (k == SDLK_LEFT || k == SDLK_a) menu.left = true;
         if (k == SDLK_RIGHT || k == SDLK_d) menu.right = true;
         if (k == SDLK_RETURN || k == SDLK_SPACE || k == SDLK_KP_ENTER) menu.confirm = true;
-        if (k == SDLK_ESCAPE || k == SDLK_BACKSPACE) menu.back = true;
-        if (k == SDLK_ESCAPE || k == SDLK_p) menu.pause = true;
+        if (k == SDLK_ESCAPE || k == SDLK_BACKSPACE || k == SDLK_AC_BACK) menu.back = true;   // AC_BACK: Android back
+        if (k == SDLK_ESCAPE || k == SDLK_p || k == SDLK_AC_BACK) menu.pause = true;
         // gears
         if (k == SDLK_RSHIFT || k == SDLK_m) shiftUp_[0] = true;
         if (k == SDLK_RCTRL || k == SDLK_n) shiftDown_[0] = true;

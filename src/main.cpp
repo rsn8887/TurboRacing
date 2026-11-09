@@ -234,7 +234,7 @@ struct App {
     // ------------------------------------------------------------- race ----
     void updateRace(double dt) {
         stateTime += dt;
-        if (input.menu.pause) { state = State::Paused; pauseSel = 0; audio.silenceLoops(); audio.setTunnel(0); return; }
+        if (input.menu.pause || input.menu.background) { state = State::Paused; pauseSel = 0; audio.silenceLoops(); audio.setTunnel(0); return; }
         PlayerInput in[2];
         for (int p = 0; p < opt.players; ++p) in[p] = input.player(p, opt.players);
         race.update(dt, in);
@@ -659,6 +659,11 @@ PlayerInput pilotInput(const Race& r, int idx, double caution) {
 int main(int argc, char** argv) {
 #ifdef __SWITCH__
     romfsInit();                             // the assets folder is packed into the .nro's romfs
+#endif
+#ifdef __ANDROID__
+    // the Back button (on some handhelds also the B button) comes to the game as a key instead of closing the app
+    SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
+    SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
 #endif
     // test mode: --shot out.bmp [--stage N] [--seconds S] [--players P] [--title] [--auto]
     const char* shot = nullptr;

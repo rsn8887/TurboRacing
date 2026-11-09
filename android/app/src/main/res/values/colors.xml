@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- behind the adaptive launcher icon: the deep violet of the icon's sky -->
+    <color name="ic_launcher_background">#2A1450</color>
+</resources>

@@ -4,6 +4,9 @@
 //   icon_switch.jpg  256x256 JPEG for the Switch homebrew menu (nx_create_nro ICON)
 //   icon_macos.png   1024x1024 with the rounded macOS shape and margin
 //   TurboRacing.icns the macOS app icon (all sizes, built from icon_macos.png)
+//   android/mipmap-*/ic_launcher.png             Android launcher icons (the macOS shape, for older launchers)
+//   android/mipmap-*/ic_launcher_foreground.png  the foreground of the adaptive icon (Android 8+): the rounded
+//                                                icon inside the safe zone; the background colour is in the app
 //
 // The scene: a sunset over a road, with the red sport car seen from behind, rendered from its 3D model.
 #include "icongen.h"
@@ -14,6 +17,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 #include <vector>
 
 namespace {
@@ -215,5 +219,23 @@ bool generateIcons(const std::string& dir, std::string& err) {
     if (!stbi_write_jpg((dir + "/icon_switch.jpg").c_str(), sw.w, sw.h, 3, rgb3.data(), 95)) return fail("icon_switch.jpg");
     if (!writeFile(dir + "/icon_macos.png", pngBytes(mac))) return fail("icon_macos.png");
     if (!writeIcns(dir + "/TurboRacing.icns", mac)) return fail("TurboRacing.icns");
+    // Android: five densities; the adaptive icon is 108 dp, of which the launcher shows at least the middle 66 dp
+    struct D { const char* name; int legacy, adaptive; };
+    const D dens[] = {{"mdpi", 48, 108}, {"hdpi", 72, 162}, {"xhdpi", 96, 216}, {"xxhdpi", 144, 324}, {"xxxhdpi", 192, 432}};
+    for (const D& d : dens) {
+        std::string sub = "android/mipmap-" + std::string(d.name);
+        std::error_code ec;
+        std::filesystem::create_directories(dir + "/" + sub, ec);
+        if (!writeFile(dir + "/" + sub + "/ic_launcher.png", pngBytes(resized(mac, d.legacy, d.legacy))))
+            return fail(sub + "/ic_launcher.png");
+        Bitmap fg(d.adaptive, d.adaptive);
+        int inner = int(std::lround(d.adaptive * 0.76));            // the rounded square then spans ~61%: inside 66 dp
+        Bitmap icon = resized(mac, inner, inner);
+        int off = (d.adaptive - inner) / 2;
+        for (int y = 0; y < inner; ++y)
+            for (int x = 0; x < inner; ++x) fg.px[size_t(y + off) * fg.w + (x + off)] = icon.px[size_t(y) * inner + x];
+        if (!writeFile(dir + "/" + sub + "/ic_launcher_foreground.png", pngBytes(fg)))
+            return fail(sub + "/ic_launcher_foreground.png");
+    }
     return true;
 }

@@ -48,12 +48,23 @@ On the Switch:
 - Launch the game through title takeover (hold **R** while starting an installed game). The album applet doesn't have enough memory for it.
 - For less memory and CPU load, add `-DTURBO_RENDER_SCALE=1` to the first `cmake` command. The game then renders at 640×360.
 
+**Android** (handhelds like the Ayaneo Pocket Air Mini, and phones or TVs with a controller)
+```sh
+docker build --platform linux/amd64 -t turboracing-android TurboRacing/android
+docker run --rm --platform linux/amd64 -v "$PWD":/work turboracing-android
+```
+The first command builds the Docker image once, with the Android SDK and NDK, Gradle and the SDL sources (about 5 GB). The second builds `build-android/TurboRacing-<version>.apk`. Install it with `adb install -r`, or copy it to the device and open it there.
+- The build tools only exist for x86-64, so on Apple Silicon Docker emulates them and the first build takes a while. Turning on "Use Rosetta for x86_64/amd64 emulation" in Docker Desktop's settings makes it much faster.
+- `build-android/turboracing.keystore` signs the APK. Keep it: with the same key, new versions install over old ones.
+- For slower devices, add `-e RENDER_SCALE=1` to `docker run` to render at 640×360.
+- The game needs a controller (built in or connected); there are no touch controls. The Back button pauses the race.
+
 ## Assets
 
 All graphics are PNG atlases in `assets/` and can be edited with any image editor that keeps the alpha channel. Each picture has a 1-pixel magenta (255, 0, 255) frame around it. Its position is listed in the `.txt` file next to the PNG. Car bodies are grey and get recoloured where the matching `_paint.png` mask is white.
 
 `./build/turbo_assetgen TurboRacing/assets` regenerates all assets. **Careful: this overwrites your hand edits.**
 
-The app icons are in `icon/`: `icon_switch.jpg` for the Switch, `TurboRacing.icns` for macOS, and `icon.png` as the 1024×1024 original. `./build/turbo_assetgen --icons TurboRacing/icon` paints them again.
+The app icons are in `icon/`: `icon_switch.jpg` for the Switch, `TurboRacing.icns` for macOS, `android/` for Android, and `icon.png` as the 1024×1024 original. `./build/turbo_assetgen --icons TurboRacing/icon` paints them again.
 
 assisted by Claude
