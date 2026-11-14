@@ -333,12 +333,14 @@ void drawExitFace(Canvas& cv, const Rect& vp, const Theme& th, double xCenter, d
 
 // bottom = where the car's wheels are on screen, groundY = where its shadow falls (differs while airborne)
 void drawCarSprite(Canvas& cv, const Car& c, double cx, double bottom, double groundY, double w, double clip, double fog,
-                   Color fogColor, double shadowAlpha = 1.0, double viewAngle = 0, double viewElev = CAR_ELEV_DEG[CAR_ELEV_LEVEL]) {
+                   Color fogColor, double shadowAlpha = 1.0, double viewAngle = 0, double viewElev = CAR_ELEV_DEG[CAR_ELEV_LEVEL],
+                   unsigned frame = 0) {
     // yaw frame: which side of the car we see. Its own steering (up to 15 degrees at full lock) plus the
     // angle we look at it from - a car to our left shows a little of its right side and vice versa. The
     // viewing angle is toned down (0.55) so cars beside the road don't swing round too far.
-    double yawDeg = c.steerVis * 15.0 + viewAngle * 0.55;
-    int yawIdx = int(std::lround(yawDeg / CAR_YAW_STEP));
+    // A drift swings the tail out: the car points further into the bend than its steering alone would show.
+    double yawDeg = c.steerVis * 15.0 * (1 - 0.45 * std::fabs(c.driftVis)) + c.driftVis * 14.0 + viewAngle * 0.55;
+    int yawIdx = std::clamp(int(std::lround(yawDeg / CAR_YAW_STEP)), -(CAR_YAWS - 1), CAR_YAWS - 1);
     if (c.crashTimer > 0) {      // spinning: sweep through the yaw frames, mirrored every other half turn
         double ph = c.crashTimer * 6.0;
         yawIdx = int(std::lround(std::sin(ph * M_PI) * (CAR_YAWS - 1)));
@@ -363,6 +365,19 @@ void drawCarSprite(Canvas& cv, const Car& c, double cx, double bottom, double gr
     drawCarShadow(cv, c.type, yawIdx, elevIdx, cx - w / 2, groundTop, w, h, shadowClip, sa);
     double top = bottom - h * double(CAR_ANCHOR_Y) / CAR_BMP_H;
     drawCar(cv, c.type, CAR_COLORS[c.color], yawIdx, elevIdx, c.braking, cx - w / 2, top, w, h, clip, fog, fogColor);
+    // nitrous: a flame out of every exhaust pipe, exactly where the pipe is in this frame
+    if (c.boostVis > 0.05 && c.crashTimer <= 0) {
+        thread_local std::vector<std::array<double, 2>> ex;
+        carExhausts(c.type, yawIdx, elevIdx, cx - w / 2, top, w, h, ex);
+        double size = body * (ex.size() >= 4 ? 0.30 : 0.40) * c.boostVis;
+        for (size_t k = 0; k < ex.size(); ++k) {
+            if (ex[k][1] > clip) continue;
+            double flick = 0.75 + 0.5 * frand(frame * 7 + unsigned(k) * 3 + unsigned(c.type) * 11);
+            double sz = size * flick, x = ex[k][0], y = ex[k][1];
+            cv.blitScaled(gfx.flame, x - sz * 0.75, y - sz * 0.45, sz * 1.5, sz * 0.9, false, clip, 0, 0, 0.55 * c.boostVis);
+            cv.blitScaled(gfx.flame, x - sz / 2, y - sz / 2, sz, sz, false, clip, 0, 0, c.boostVis);
+        }
+    }
 }
 
 void hudPanel(UiCanvas& cv, double x, double y, double w, double h) {
@@ -420,8 +435,8 @@ void drawHud(Canvas& canvas, const Rect& vpPx, const Race& race, int idx, int fr
     text.draw("KM/H", rx, by - 13 * f, label, ALIGN_RIGHT);
     text.draw(std::to_string(kmh), rx - 34 * f, by - 32 * f, styleDisplay(26 * f, white, rgb(150, 190, 255)), ALIGN_RIGHT);
 
-    // gear + rev bar (bottom left)
-    hudPanel(cv, vp.x, int(by - 34 * f), int(150 * f), int(34 * f + pad));
+    // gear + rev bar + nitrous bar (bottom left)
+    hudPanel(cv, vp.x, int(by - 50 * f), int(150 * f), int(50 * f + pad));
     bool man = race.manual[std::max(0, c.player)];
     text.draw("GEAR", vp.x + pad, by - 13 * f, label);
     text.draw(std::string(1, char('1' + c.gear)), vp.x + pad + 34 * f, by - 19 * f, styleDisplay(16 * f, white, rgb(170, 200, 255)));
@@ -436,6 +451,24 @@ void drawHud(Canvas& canvas, const Rect& vpPx, const Race& race, int idx, int fr
         int x = int(bx + i * (sw + gap)), y = int(byy), w = std::max(1, int(sw)), h = std::max(2, int(sh));
         if (litSeg) cv.vgradRect(x, y, w, h, shade(col, 1.25), shade(col, 0.6));
         else cv.vgradRect(x, y, w, h, rgb(50, 54, 70), rgb(24, 26, 36));
+    }
+    // nitrous: drains while boosting, refills slowly and faster while drifting; flashes while in use
+    {
+        bool flash = c.boosting && (frame / 4) % 2;
+        double ny = byy - 15 * f, nh = 7 * f;
+        text.draw("N2O", bx, ny - 2.5 * f, styleUI(8.5 * f, c.boosting ? rgb(140, 240, 255) : yellow));
+        double gx = bx + 26 * f, gw = segs * (sw + gap) - gap - 26 * f;
+        int n = 12;
+        double cw = (gw + gap) / n;
+        for (int i = 0; i < n; ++i) {
+            double fr = double(i) / n;
+            bool on = c.nitro > fr + 0.5 / n;
+            Color col = lerpColor(rgb(80, 230, 255), rgb(70, 100, 255), fr);
+            if (flash) col = shade(col, 1.35);
+            int x = int(gx + i * cw), y = int(ny), w = std::max(1, int(cw - gap)), h = std::max(2, int(nh));
+            if (on) cv.vgradRect(x, y, w, h, shade(col, 1.25), shade(col, 0.6));
+            else cv.vgradRect(x, y, w, h, rgb(50, 54, 70), rgb(24, 26, 36));
+        }
     }
 
     // countdown lights
@@ -489,7 +522,8 @@ void renderView(Canvas& cv, const Rect& vp, const Race& race, int carIndex, cons
     double* const ceilClip = ceilBuf.data();
 
     const double focal = vp.h * (320.0 / 360.0);
-    const double depth = 1.0 / std::tan(FIELD_OF_VIEW / 2 * M_PI / 180);
+    // nitrous widens the view a little: the road stretches away and rushes past (the car stays the same size)
+    const double depth = 1.0 / std::tan((FIELD_OF_VIEW + 14 * car.boostVis) / 2 * M_PI / 180);
     const double s = focal / 320.0;
     double horizonY = vp.y + vp.h * HORIZON_FRAC;
     const double bottomY = vp.y + vp.h - vp.h * 0.03;
@@ -783,7 +817,7 @@ void renderView(Canvas& cv, const Rect& vp, const Race& race, int carIndex, cons
             double ratio = (ry - horizonY) / (bottomY - horizonY);
             double viewElev = std::atan(std::tan(CAR_ELEV_DEG[CAR_ELEV_LEVEL] * M_PI / 180) * ratio) * 180 / M_PI;
             drawCarSprite(cv, c, carX, ry - lift, ry, w, p.clip, fogC, fogCol, std::clamp(1 - c.air / 2400, 0.35, 1.0), viewAngle,
-                          viewElev);
+                          viewElev, unsigned(opt.frame));
             if (c.onDirt && !c.airborne && c.speed > 2000 * SPEED_SCALE) {     // dust cloud behind cars on dirt
                 for (int i = 0; i < 3; ++i) {
                     double age = std::fmod(race.time * 2.5 + i / 3.0 + r.idx * 0.37, 1.0);
@@ -809,7 +843,8 @@ void renderView(Canvas& cv, const Rect& vp, const Race& race, int carIndex, cons
         if (car.offroad && car.speed > 500) bounce += (frand(opt.frame * 13 + carIndex) - 0.5) * 3 * s;
         double tint = 0;
         if (car.inTunnel) tint = tunnelCarShade(car.dist, 0);   // dark, lit up briefly under each row of lamps
-        drawCarSprite(cv, car, cx, by + bounce, groundScreen, w, 1e9, tint, TUNNEL_BLACK, std::clamp(1 - car.air / 2400, 0.35, 1.0));
+        drawCarSprite(cv, car, cx, by + bounce, groundScreen, w, 1e9, tint, TUNNEL_BLACK, std::clamp(1 - car.air / 2400, 0.35, 1.0),
+                      0, CAR_ELEV_DEG[CAR_ELEV_LEVEL], unsigned(opt.frame));
 
         double bw = CAR_WORLD_W * sc * focal, bh = bw * 0.45;
         // dust / tyre smoke (soft alpha puffs drifting up and back)
@@ -817,13 +852,19 @@ void renderView(Canvas& cv, const Rect& vp, const Race& race, int carIndex, cons
         bool smoke = car.skid > 0.3 && car.speed > 2000 * SPEED_SCALE;
         if (dust || smoke) {
             const Bitmap& pb = dust ? gfx.dust : gfx.smoke;
-            for (int i = 0; i < 8; ++i) {
-                double age = std::fmod(race.time * 3.0 + i * 0.125, 1.0);         // 0..1 life cycle
-                unsigned sd = unsigned(std::floor(race.time * 3.0 + i * 0.125)) * 31 + i * 7 + carIndex * 101;
+            const bool drift = car.drifting && !dust;       // drifting: thick clouds, thrown out with the swinging tail
+            const int n = drift ? 14 : 8;
+            for (int i = 0; i < n; ++i) {
+                double age = std::fmod(race.time * 3.0 + double(i) / n, 1.0);       // 0..1 life cycle
+                unsigned sd = unsigned(std::floor(race.time * 3.0 + double(i) / n)) * 31 + i * 7 + carIndex * 101;
                 double side = (i % 2) ? 1 : -1;
                 double px = cx + side * bw * (0.36 + age * 0.15) + (frand(sd) - 0.5) * bw * 0.1;
                 double py = by - bh * 0.05 - age * bh * 0.6;
                 double sz = bw * (0.16 + age * 0.26);
+                if (drift) {
+                    px -= car.driftVis * bw * (0.1 + age * 0.35);
+                    sz *= 1.35;
+                }
                 cv.blitScaled(pb, px - sz / 2, py - sz / 2, sz, sz, false, 1e9, 0, 0, (1 - age) * 0.9);
             }
         }

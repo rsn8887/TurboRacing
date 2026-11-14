@@ -89,6 +89,15 @@ void drawCar(Canvas& cv, int type, Color color, int yawIdx, int elev, bool brake
         for (const CarFrame& o : cs.brake[a][elev]) drawCarFrame(cv, o, pal, x, y, w, h, flip, clipBottom, fog, fogColor);
 }
 
+void carExhausts(int type, int yawIdx, int elev, double x, double y, double w, double h, std::vector<std::array<double, 2>>& out) {
+    const CarSprites& cs = sprites[std::clamp(type, 0, CAR_TYPES - 1)];
+    yawIdx = std::clamp(yawIdx, -(CAR_YAWS - 1), CAR_YAWS - 1);
+    elev = std::clamp(elev, 0, CAR_ELEV - 1);
+    out.clear();
+    for (const auto& p : cs.exhaust[std::abs(yawIdx)][elev])          // turned left: the mirrored frame
+        out.push_back({x + (yawIdx < 0 ? 1 - p[0] : p[0]) * w, y + p[1] * h});
+}
+
 void drawCarShadow(Canvas& cv, int type, int yawIdx, int elev, double x, double y, double w, double h, double clipBottom,
                    double alpha) {
     const CarSprites& cs = sprites[std::clamp(type, 0, CAR_TYPES - 1)];

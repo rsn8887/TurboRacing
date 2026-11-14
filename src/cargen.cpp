@@ -144,7 +144,13 @@ void armMirrors(Mesh& m, double xCab, double xIn, double xOut, double yBase, dou
     }
 }
 
+// exhaust pipes as they are painted onto the rear decal (x, height in cm) and the z of the tail they sit on:
+// collected while a model is built, so the generator knows where the nitrous flames come out
+thread_local std::vector<std::pair<double, double>> g_pipes;
+thread_local double g_tailZ = 0;
+
 void loft(Mesh& m, const std::vector<Sec>& secs, const Tex* rearTex, int mat = M_BODY) {
+    if (rearTex) g_tailZ = secs[0].z;
     lastLoft = secs;
     for (size_t i = 0; i + 1 < secs.size(); ++i) {
         auto a = secPoints(secs[i]), b = secPoints(secs[i + 1]);
@@ -216,6 +222,7 @@ void plate(Decal& d, double cx, double h0, double hw = 17, double hh = 10) {
     for (int i = 0; i < 5; ++i) d.rect(cx - hw + 5 + i * (2 * hw - 10) / 5.0, h0 + 2.5, cx - hw + 5 + i * (2 * hw - 10) / 5.0 + 3.6, h0 + hh - 2.5, rgb(30, 30, 40));
 }
 void pipe(Decal& d, double x, double h, double r) {
+    g_pipes.push_back({x, h});
     d.ellipse(x, h, r * 1.25, r, sphere(d.X(x), d.Y(h), r * 1.25 * d.k, r * d.k, rgb(160, 162, 172), 0.4, 0.8, 26));
     d.ellipse(x, h - 0.2, r * 0.85, r * 0.68, rgb(8, 8, 10));
 }
@@ -266,6 +273,7 @@ Tex slatsDecal(int n, bool bed) {
 struct Model {
     Mesh mesh;
     double rearAxleZ = -130;
+    std::vector<V3> exhausts;                // the exhaust pipe openings (see g_pipes)
     std::vector<std::unique_ptr<Tex>> texs;
     const Tex* add(Tex t) { texs.push_back(std::make_unique<Tex>(std::move(t))); return texs.back().get(); }
 };
@@ -376,6 +384,7 @@ void suv(Model& M, bool brake) {
     d.paintAll();
     d.rect(-92, 32, 92, 46, d.vg(32, 46, rgb(26, 26, 30), rgb(70, 70, 78)), 3);    // bumper
     d.rect(-20, 42, 20, 45, rgb(96, 96, 106));
+    pipe(d, -62, 37, 4.6);
     plate(d, 0, 54);
     for (int s : {-1, 1}) {
         double x0 = s < 0 ? -91 : 79, x1 = s < 0 ? -79 : 91;
@@ -407,6 +416,7 @@ void pickup(Model& M, bool brake) {
     d.paintAll();
     d.rect(-94, 34, 94, 48, cylY(d.Y(48), d.Y(34), CHROME, 0.45, 0.9, 30), 3);      // chrome bumper
     d.rect(-24, 43, 24, 46, rgb(40, 40, 48));
+    pipe(d, -66, 38, 4.6);
     d.rect(-84, 68, 84, 69, alpha(BLACK, 0.3));
     d.rect(-84, 100, 84, 101, alpha(BLACK, 0.3));
     d.rect(-12, 102, 12, 107, rgb(20, 20, 24), 1.5);                              // tailgate handle
@@ -441,6 +451,7 @@ void sedan(Model& M, bool brake) {
     d.paintAll();
     d.rect(-86, 22, 86, 36, d.vg(22, 36, rgb(14, 14, 18), rgb(50, 50, 56)), 3);   // rubber bumper
     d.rect(-84, 34, 84, 35.6, CHROME);
+    pipe(d, -58, 27, 4.0);
     plate(d, 0, 38);
     for (int s : {-1, 1}) {
         double x0 = s < 0 ? -82 : 24, x1 = s < 0 ? -24 : 82;
@@ -875,6 +886,26 @@ std::vector<Base> diffOverlays(const Bitmap& base, const Bitmap& var, const std:
     return res;
 }
 
+// where model points end up in a frame rendered at (yaw, elev), as fractions of the whole frame: the same
+// projection and anchor as renderModels
+std::vector<std::array<double, 2>> projectPoints(const Model& M, double yaw, double elev, const std::vector<V3>& pts) {
+    const int W = CAR_BMP_W * SS;
+    const double D = CAR_CAM_DIST, f = CAR_PX_PER_CM * SS * (D - 200);
+    const double cy = std::cos(yaw), sy = std::sin(yaw), ce = std::cos(elev), se = std::sin(elev);
+    auto T = [&](V3 p) {
+        V3 a{p.x * cy + p.z * sy, p.y, -p.x * sy + p.z * cy};
+        return V3{a.x, a.y * ce + a.z * se, a.z * ce - a.y * se};
+    };
+    V3 ancX = T({0, 0, 0}), ancY = T({0, 0, M.rearAxleZ});
+    double ax = W / 2.0 - f * ancX.x / (D + ancX.z), ay = CAR_ANCHOR_Y * SS + f * ancY.y / (D + ancY.z);
+    std::vector<std::array<double, 2>> out;
+    for (const V3& p : pts) {
+        V3 v = T(p);
+        out.push_back({(ax + f * v.x / (D + v.z)) / SS / CAR_BMP_W, (ay - f * v.y / (D + v.z)) / SS / CAR_BMP_H});
+    }
+    return out;
+}
+
 CarFrame toFrame(Base&& b) {
     CarFrame f;
     f.ox = b.ox; f.oy = b.oy;
@@ -896,7 +927,9 @@ void generateCarSprites(CarSprites out[CAR_TYPES]) {
             builders.emplace_back([type] {
                 for (auto& m : models[type]) m = Model();
                 g_glare = false;
+                g_pipes.clear();
                 BUILD[type](models[type][0], false);
+                for (auto& p : g_pipes) models[type][0].exhausts.push_back({p.first, p.second, g_tailZ - 2});
                 BUILD[type](models[type][1], true);
                 g_glare = true;
                 BUILD[type](models[type][2], false);
@@ -941,6 +974,7 @@ void generateCarSprites(CarSprites out[CAR_TYPES]) {
                     gl.clear();
                     for (Base& o : diffOverlays(il[0], il[1], ml[1], mirroredX, car.oy)) gl.push_back(toFrame(std::move(o)));
                 }
+                cs.exhaust[s][pi] = projectPoints(model[0], yaw, el, model[0].exhausts);
                 if (pi % 2 == 1)    // shadows for elevations 1, 3, 5, turned right (s) and left (-s)
                     for (int sg : {1, -1}) {
                         if (s == 0 && sg < 0) continue;

@@ -5,7 +5,7 @@
 
 Audio audio;
 
-static const double SHOT_LEN[] = {0.18, 0.45, 1.0, 0.18, 0.36, 0.04, 0.12, 1.2, 0.3};
+static const double SHOT_LEN[] = {0.18, 0.45, 1.0, 0.18, 0.36, 0.04, 0.12, 1.2, 0.3, 1.1};
 
 float Audio::rnd() {
     noise_ ^= noise_ << 13; noise_ ^= noise_ >> 17; noise_ ^= noise_ << 5;
@@ -72,7 +72,7 @@ void Audio::play(Sfx s) {
     if (!ready() || !on_) return;
     lock();
     for (auto& sh : shots_)
-        if (sh.kind < 0) { sh.kind = s; sh.t = 0; break; }
+        if (sh.kind < 0) { sh.kind = s; sh.t = 0; sh.lp = sh.lp2 = 0; break; }
     unlock();
 }
 
@@ -169,6 +169,14 @@ void Audio::mix(float* out, int n) {
             case SFX_MENU_SELECT: v = sq(700 + t * 6000) * 0.15 * env; break;
             case SFX_LAND:        v = std::sin(tau * (70 - t * 80) * t) * 0.9 * env * env + rnd() * 0.25 * std::exp(-t * 25); break;
             case SFX_TIMEOUT:     v = sq(t < 0.4 ? 330 : t < 0.8 ? 262 : 196) * 0.2 * (env > 0.1 ? 1 : env * 10); break;
+            case SFX_NITRO: {     // whoosh: band-passed noise sweeping up, over a rising low roar
+                double k = 0.04 + 0.30 * std::min(1.0, t / 0.35);
+                sh.lp += (rnd() - sh.lp) * k;
+                sh.lp2 += (sh.lp - sh.lp2) * 0.04;
+                double att = std::min(1.0, t / 0.05) * env * env;
+                v = (sh.lp - sh.lp2) * 1.6 * att + std::sin(tau * (60 + t * 90) * t) * 0.35 * att;
+                break;
+            }
             }
             s += v;
             sh.t += dt;

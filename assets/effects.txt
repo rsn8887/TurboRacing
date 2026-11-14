@@ -1,8 +1,9 @@
 # effects atlas: name  x y w h
-dust  253 1 24 24
-smoke  278 1 24 24
-spark  303 1 24 24
+dust  286 1 24 24
+smoke  311 1 24 24
+spark  336 1 24 24
 lamp_glow  220 1 32 32
 light_red  1 1 72 68
 light_green  74 1 72 68
 light_off  147 1 72 68
+flame  253 1 32 32

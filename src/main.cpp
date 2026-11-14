@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -423,7 +424,8 @@ struct App {
             }
         }
         TextStyle hint = ui(9.5, rgb(225, 228, 240));
-        text.draw("P1: ARROWS  (Z/X GEARS)     P2: WASD  (Q/E)     PADS: STICK, A/B, LB/RB", SCREEN_W / 2.0, SCREEN_H - 30, hint, ALIGN_CENTER);
+        text.draw("TAP THE BRAKE IN A BEND TO DRIFT  -  DRIFTING REFILLS THE NITRO", SCREEN_W / 2.0, SCREEN_H - 42, hint, ALIGN_CENTER);
+        text.draw("P1: ARROWS, SPACE NITRO, Z/X GEARS    P2: WASD, SHIFT NITRO, Q/E    PADS: A/B, X/Y NITRO, LB/RB", SCREEN_W / 2.0, SCREEN_H - 30, hint, ALIGN_CENTER);
         text.draw("v" GAME_VERSION "  -  by rsn8887", SCREEN_W / 2.0, SCREEN_H - 16, ui(8.5, rgb(170, 175, 200)), ALIGN_CENTER);
     }
 
@@ -652,7 +654,25 @@ PlayerInput pilotInput(const Race& r, int idx, double caution) {
         double dd = o.dist - c.dist;
         if (dd > 0 && dd < 8 * SEG_LEN && std::fabs(o.x - c.x) < 0.7) xt = (o.x > 0 ? -0.55 : 0.55) * w;
     }
+    // before a jump: line up straight in the middle (no sideways motion to carry through the air)
+    for (int j : t.jumps_) {
+        double ahead = t.wrap(j * SEG_LEN - t.wrap(c.dist));
+        if (ahead < 45 * SEG_LEN) { xt = 0; drift *= 0.3; }
+    }
     in.steer = std::clamp((drift + 2.5 * (xt - c.x) - 0.3 * c.vx) / std::max(auth, 0.1), -1.0, 1.0);
+    // TURBO_PILOT_FX=1: also use nitro on long straights and drift into the sharper bends (a brake tap on entry)
+    static const bool fx = std::getenv("TURBO_PILOT_FX") != nullptr;
+    if (fx) {
+        if (target >= CAR_STATS[c.type].top * MAX_SPEED * 0.9 && c.nitro > 0.25 && std::fabs(s.curve) < 1) in.nitro = true;
+        if (c.drifting) { in.throttle = 1; in.brake = 0; }        // drifting: flat out through the bend
+        double bendAhead = 0;
+        for (int k = 2; k < 12; ++k) bendAhead = std::max(bendAhead, std::fabs(t.find(c.dist + k * SEG_LEN).curve));
+        if (!c.drifting && sp > 0.55 && bendAhead >= 3.5 && std::fabs(s.curve) >= 1.5 && !dirt && !c.braking) {
+            in.brake = 1;                                            // the tap (one frame; letting go starts the drift)
+            in.steer = s.curve > 0 ? 1 : -1;
+        }
+        if (c.drifting && std::fabs(s.curve) < 1.0) in.steer = -c.driftDir;   // bend over: countersteer out of it
+    }
     return in;
 }
 
@@ -793,8 +813,9 @@ int main(int argc, char** argv) {
                 frameMs.push_back((SDL_GetPerformanceCounter() - t0) * 1000.0 / SDL_GetPerformanceFrequency());
                 if (telemetry > 0 && i % std::max(1, int(telemetry * 60)) == 0) {   // debug: player car log
                     const Car& c = app.race.cars[app.race.humanCar(0)];
-                    std::printf("t=%6.2f seg=%5d kmh=%5.1f gear=%d air=%6.0f vy=%7.0f left=%5.1f%s%s\n", i * STEP, int(c.dist / SEG_LEN),
-                            c.speed / MAX_SPEED * KMH_AT_MAX, c.gear + 1, c.air, c.vy, c.timeLeft,
+                    std::printf("t=%6.2f seg=%5d kmh=%5.1f gear=%d air=%6.0f vy=%7.0f x=%5.2f vx=%5.2f nos=%.2f%s%s left=%5.1f%s%s\n", i * STEP,
+                            int(c.dist / SEG_LEN), c.speed / MAX_SPEED * KMH_AT_MAX, c.gear + 1, c.air, c.vy, c.x, c.vx, c.nitro,
+                            c.boosting ? " BOOST" : "", c.drifting ? " DRIFT" : "", c.timeLeft,
                             c.outOfTime ? " OUT-OF-TIME" : "", c.timedOut ? " TIMED-OUT" : "");
                 }
             }

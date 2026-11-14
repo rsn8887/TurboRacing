@@ -204,9 +204,29 @@ void Track::width(int n, double w) {
 }
 
 void Track::tunnel(int n, double c) {
+    // long: a SHORT tunnel is ~800 segments (about 8 s at top speed). Inside, straights alternate with bends
+    // that change direction; 'c' sets the main bend. Two patterns take turns, so no two tunnels in a row
+    // feel the same; a tunnel given no bend becomes a gentle S.
+    const int k = int(tunnels_.size());
     tunnels_.push_back(count());
     inTunnel_ = true;
-    addRoad(n, n * 30, n, c, 0, 1.0);     // long: a SHORT tunnel is ~800 segments (about 8 s at top speed)
+    double main = c != 0 ? c : (k % 2 ? 2.0 : -2.0);
+    addRoad(n, n, n, 0, 0, 1.0);                       // straight in
+    if (k % 2 == 0) {
+        addRoad(n, n * 5, n, main, 0, 1.0);                      // the main bend
+        addRoad(n / 2, n * 2, n / 2, 0, 0, 1.0);                 // short straight
+        addRoad(n, n * 4, n, -main * 0.7, 0, 1.0);               // back the other way
+        addRoad(n, n * 3, n, 0, 0, 1.0);                         // long straight
+        addRoad(n, n * 3, n, main * 1.3, 0, 1.0);                // a tighter one
+    } else {
+        addRoad(n, n * 3, n, -main * 0.6, 0, 1.0);               // a gentle lead-in the other way
+        addRoad(n / 2, n, n / 2, 0, 0, 1.0);
+        addRoad(n, n * 6, n, main, 0, 1.0);                      // the long main bend
+        addRoad(n, n * 4, n, 0, 0, 1.0);                         // flat-out straight
+        addRoad(n, n * 2, n, -main * 1.2, 0, 1.0);               // a sharp flick back
+        addRoad(n, n * 2, n, main * 0.5, 0, 1.0);
+    }
+    addRoad(n, n, n, 0, 0, 1.0);                                 // straight out
     inTunnel_ = false;
 }
 
@@ -671,9 +691,18 @@ void Track::build(int st) {
     length = count() * SEG_LEN;
     // mid-lap checkpoint: half way round, moved forward out of tunnels and width changes
     int cp = count() / 2;
-    while (segs[cp].tunnel || std::fabs(segs[cp].w1 - 1) > 0.02 || std::fabs(segs[cp].w2 - 1) > 0.02 ||
-           segs[(cp + 6) % count()].tunnel)
-        cp = (cp + 1) % count();
+    // the nearest spot to half way, forwards or backwards, that is not in a tunnel, in front of a portal or on
+    // a road of unusual width
+    auto ok = [&](int i) {
+        i = ((i % count()) + count()) % count();
+        return !segs[i].tunnel && std::fabs(segs[i].w1 - 1) <= 0.02 && std::fabs(segs[i].w2 - 1) <= 0.02 &&
+               !segs[(i + 6) % count()].tunnel;
+    };
+    for (int d = 0; d < count(); ++d) {
+        if (ok(cp + d)) { cp += d; break; }
+        if (ok(cp - d)) { cp -= d; break; }
+    }
+    cp = ((cp % count()) + count()) % count();
     checkpointZ = cp * SEG_LEN;
     decorate(1234u + unsigned(st) * 777u);
 }

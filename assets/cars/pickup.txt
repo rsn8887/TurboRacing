@@ -4,6 +4,62 @@ frame 560 408
 # car/brake <yaw step> <elevation>  x y w h  ox oy scale   (yaw step * 2.5 deg to the right, mirrored for the left; brake = lit brake lights drawn over the car)
 # glare <yaw step -8..8> <elevation>: reflections on the glass, drawn over the car (never mirrored)
 # shadow <yaw step -8..8> <shadow elevation 0-2 = car elevations 1, 3, 5>: the shadow on the road
+# exhaust <yaw step> <elevation>  x y  x y ...: the exhaust pipes in that car frame, as fractions of the whole
+#   frame (0..1); the nitrous flames come out there
+exhaust 0 0  0.3179 0.7332
+exhaust 0 1  0.3177 0.7523
+exhaust 0 2  0.3177 0.7752
+exhaust 0 3  0.3177 0.8019
+exhaust 0 4  0.3179 0.8289
+exhaust 0 5  0.3182 0.8561
+exhaust 1 0  0.2881 0.7331
+exhaust 1 1  0.2879 0.7516
+exhaust 1 2  0.2878 0.7737
+exhaust 1 3  0.2879 0.7995
+exhaust 1 4  0.2881 0.8256
+exhaust 1 5  0.2884 0.8520
+exhaust 2 0  0.2589 0.7330
+exhaust 2 1  0.2587 0.7508
+exhaust 2 2  0.2586 0.7721
+exhaust 2 3  0.2586 0.7969
+exhaust 2 4  0.2589 0.8222
+exhaust 2 5  0.2592 0.8476
+exhaust 3 0  0.2303 0.7330
+exhaust 3 1  0.2301 0.7500
+exhaust 3 2  0.2300 0.7704
+exhaust 3 3  0.2300 0.7943
+exhaust 3 4  0.2303 0.8185
+exhaust 3 5  0.2307 0.8430
+exhaust 4 0  0.2025 0.7330
+exhaust 4 1  0.2022 0.7492
+exhaust 4 2  0.2021 0.7687
+exhaust 4 3  0.2022 0.7915
+exhaust 4 4  0.2024 0.8148
+exhaust 4 5  0.2028 0.8383
+exhaust 5 0  0.1754 0.7329
+exhaust 5 1  0.1752 0.7484
+exhaust 5 2  0.1750 0.7669
+exhaust 5 3  0.1751 0.7886
+exhaust 5 4  0.1753 0.8108
+exhaust 5 5  0.1758 0.8333
+exhaust 6 0  0.1492 0.7330
+exhaust 6 1  0.1490 0.7475
+exhaust 6 2  0.1488 0.7651
+exhaust 6 3  0.1488 0.7857
+exhaust 6 4  0.1491 0.8068
+exhaust 6 5  0.1495 0.8282
+exhaust 7 0  0.1239 0.7330
+exhaust 7 1  0.1237 0.7467
+exhaust 7 2  0.1235 0.7632
+exhaust 7 3  0.1235 0.7827
+exhaust 7 4  0.1237 0.8027
+exhaust 7 5  0.1242 0.8230
+exhaust 8 0  0.0996 0.7330
+exhaust 8 1  0.0993 0.7458
+exhaust 8 2  0.0991 0.7613
+exhaust 8 3  0.0991 0.7796
+exhaust 8 4  0.0994 0.7984
+exhaust 8 5  0.0998 0.8176
 car 0 0  756 1615 300 247  130 108 1
 brake 0 0  125 2555 70 10  242 140 1
 brake 0 0  2012 2366 31 74  130 188 1

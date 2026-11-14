@@ -3,7 +3,7 @@
 #pragma once
 #include <SDL.h>
 
-enum Sfx { SFX_BEEP_LOW, SFX_BEEP_HIGH, SFX_CRASH, SFX_BUMP, SFX_CHECKPOINT, SFX_MENU_MOVE, SFX_MENU_SELECT, SFX_TIMEOUT, SFX_LAND };
+enum Sfx { SFX_BEEP_LOW, SFX_BEEP_HIGH, SFX_CRASH, SFX_BUMP, SFX_CHECKPOINT, SFX_MENU_MOVE, SFX_MENU_SELECT, SFX_TIMEOUT, SFX_LAND, SFX_NITRO };
 
 class Audio {
 public:
@@ -50,7 +50,7 @@ private:
         double ph1 = 0, ph2 = 0, ph3 = 0, lp = 0, lp2 = 0;
     } opp_[OPP_VOICES];
 
-    struct Shot { int kind = -1; double t = 0; } shots_[12];
+    struct Shot { int kind = -1; double t = 0, lp = 0, lp2 = 0; } shots_[12];
     unsigned noise_ = 22222;
     double tunnel_ = 0, cTunnel_ = 0;
     float echo_[2][8192] = {};

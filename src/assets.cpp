@@ -31,7 +31,8 @@ namespace { template <class T> std::string num(T v) { std::ostringstream o; o <<
 
 namespace {
 const char* const CAR_FILE[CAR_TYPES] = {"sport", "coupe", "supercar", "suv", "pickup", "sedan"};
-const char* const EFFECT_NAMES[] = {"dust", "smoke", "spark", "lamp_glow", "light_red", "light_green", "light_off"};
+const char* const EFFECT_NAMES[] = {"dust", "smoke", "spark", "lamp_glow", "light_red", "light_green", "light_off", "flame"};
+constexpr int NUM_EFFECTS = 8;
 constexpr int PAD = 1;     // gap between pictures in an atlas: exactly the 1-pixel magenta line between them
 // every picture in an atlas is framed by a 1-pixel magenta rectangle just outside its area, to show where it
 // ends (neighbouring pictures share the line between them); this exact colour is never used inside a picture
@@ -234,7 +235,7 @@ const std::vector<Group>& groups() {
     return g;
 }
 Bitmap* effect(Graphics& g, int i) {
-    Bitmap* e[] = {&g.dust, &g.smoke, &g.spark, &g.lampGlow, &g.lightRed, &g.lightGreen, &g.lightOff};
+    Bitmap* e[] = {&g.dust, &g.smoke, &g.spark, &g.lampGlow, &g.lightRed, &g.lightGreen, &g.lightOff, &g.flame};
     return e[i];
 }
 } // namespace
@@ -253,7 +254,7 @@ bool saveAssets(const std::string& dir, const Graphics& g0, const CarSprites car
     }
     {
         std::vector<Item> items;
-        for (int i = 0; i < 7; ++i) items.push_back({EFFECT_NAMES[i], effect(g, i)});
+        for (int i = 0; i < NUM_EFFECTS; ++i) items.push_back({EFFECT_NAMES[i], effect(g, i)});
         if (!writeAtlas(inDir(dir, "effects"), "effects atlas: name  x y w h", items, {}, 1024, err)) return false;
     }
     for (int st = 0; st < NUM_STAGES; ++st) {
@@ -299,7 +300,19 @@ bool saveAssets(const std::string& dir, const Graphics& g0, const CarSprites car
                 " deg to the right, mirrored for the left; brake = lit brake lights drawn over the car)",
             "# glare <yaw step -8..8> <elevation>: reflections on the glass, drawn over the car (never mirrored)",
             "# shadow <yaw step -8..8> <shadow elevation 0-2 = car elevations 1, 3, 5>: the shadow on the road",
+            "# exhaust <yaw step> <elevation>  x y  x y ...: the exhaust pipes in that car frame, as fractions of the whole",
+            "#   frame (0..1); the nitrous flames come out there",
         };
+        for (int s = 0; s < CAR_YAWS; ++s)
+            for (int e = 0; e < CAR_ELEV; ++e) {
+                std::string l = "exhaust " + std::to_string(s) + " " + std::to_string(e);
+                char buf[32];
+                for (const auto& p : cs.exhaust[s][e]) {
+                    std::snprintf(buf, sizeof buf, "  %.4f %.4f", p[0], p[1]);
+                    l += buf;
+                }
+                extra.push_back(l);
+            }
         if (!writeAtlas(base, std::string("car atlas: ") + CAR_FILE[t], items, extra, 4096, err, suffix)) return false;
         // paint mask in the same layout
         auto lines = readLines(base + ".txt");
@@ -346,12 +359,12 @@ bool loadAssets(const std::string& dir, Graphics& g, std::string& err) {
         Bitmap atlas;
         if (!readPng(inDir(dir, "effects.png"), atlas)) return fail("missing or unreadable " + inDir(dir, "effects.png"));
         for (auto& l : readLines(inDir(dir, "effects.txt")))
-            for (int i = 0; i < 7; ++i)
+            for (int i = 0; i < NUM_EFFECTS; ++i)
                 if (l.size() >= 5 && l[0] == EFFECT_NAMES[i]) {
                     *effect(g, i) = cutOut(atlas, std::stoi(l[1]), std::stoi(l[2]), std::stoi(l[3]), std::stoi(l[4]));
                     effect(g, i)->buildMips();
                 }
-        for (int i = 0; i < 7; ++i)
+        for (int i = 0; i < NUM_EFFECTS; ++i)
             if (effect(g, i)->w == 0) return fail(std::string("effect '") + EFFECT_NAMES[i] + "' not found in effects.txt");
     }
     for (int st = 0; st < NUM_STAGES; ++st) {
@@ -377,12 +390,18 @@ bool loadAssets(const std::string& dir, Graphics& g, std::string& err) {
         CarSprites& cs = carSprites(t);
         int fw = CAR_BMP_W, fh = CAR_BMP_H;
         for (int s = 0; s < CAR_YAWS; ++s)
-            for (int e = 0; e < CAR_ELEV; ++e) { cs.car[s][e] = CarFrame(); cs.brake[s][e].clear(); }
+            for (int e = 0; e < CAR_ELEV; ++e) { cs.car[s][e] = CarFrame(); cs.brake[s][e].clear(); cs.exhaust[s][e].clear(); }
         for (auto& row : cs.glare)
             for (auto& v : row) v.clear();
         int found = 0;
         for (auto& l : readLines(base + ".txt")) {
             if (l[0] == "frame" && l.size() >= 3) { fw = std::stoi(l[1]); fh = std::stoi(l[2]); continue; }
+            if (l[0] == "exhaust" && l.size() >= 3) {
+                int s = std::stoi(l[1]), e = std::stoi(l[2]);
+                if (s < 0 || s >= CAR_YAWS || e < 0 || e >= CAR_ELEV) continue;
+                for (size_t i = 3; i + 1 < l.size(); i += 2) cs.exhaust[s][e].push_back({std::stod(l[i]), std::stod(l[i + 1])});
+                continue;
+            }
             if ((l[0] != "car" && l[0] != "brake" && l[0] != "shadow" && l[0] != "glare") || l.size() < 10) continue;
             int s = std::stoi(l[1]), e = std::stoi(l[2]);
             int x = std::stoi(l[3]), y = std::stoi(l[4]), w = std::stoi(l[5]), h = std::stoi(l[6]);

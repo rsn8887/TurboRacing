@@ -4,6 +4,7 @@
 #include "cars.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <random>
 
 const int POINTS[10] = {20, 15, 12, 10, 8, 6, 4, 3, 2, 1};
@@ -263,6 +264,10 @@ void Race::updateHuman(Car& c, const PlayerInput& inRaw, double dt) {
         c.steerVis = 0;
         c.skid = 0;
         c.offroad = false;
+        c.drifting = false;
+        c.boosting = false;
+        c.driftVis += (0 - c.driftVis) * std::min(1.0, dt * 6);
+        c.boostVis += (0 - c.boostVis) * std::min(1.0, dt * 4);
         c.rpm += (0.15 - c.rpm) * dt * 3;
         return;
     }
@@ -271,6 +276,49 @@ void Race::updateHuman(Car& c, const PlayerInput& inRaw, double dt) {
     const bool air = c.airborne && c.air > 40;
     const bool dirt = seg.surface == SURF_DIRT && !air;
     const CarStats& st = CAR_STATS[c.type];
+    const bool racing = phase == RacePhase::Racing && !c.outOfTime && !c.timedOut;
+
+    // ---- drift: a brake tap while steering hard at speed swings the tail out (OutRun 2 style). It starts as you
+    // let go of a short brake press (holding the brake just brakes), and ends when you countersteer, straighten
+    // up for a while, slow down too much, leave the road or take off.
+    bool brakeDown = in.brake > 0.3;
+    bool tapped = false;
+    if (brakeDown) c.brakeTap += dt;
+    else {
+        tapped = c.brakeWas && c.brakeTap < DRIFT_TAP;
+        c.brakeTap = 0;
+    }
+    c.brakeWas = brakeDown;
+    if (!c.drifting && racing && tapped && !air && !c.offroad && sp > DRIFT_MIN_SPEED && std::fabs(in.steer) > 0.5) {
+        c.drifting = true;
+        c.driftDir = in.steer > 0 ? 1 : -1;
+        c.driftTime = c.driftCounter = c.driftIdle = 0;
+    }
+    if (c.drifting) {
+        c.driftTime += dt;
+        c.driftCounter = in.steer * c.driftDir < -0.4 ? c.driftCounter + dt : 0;
+        c.driftIdle = std::fabs(in.steer) < 0.15 ? c.driftIdle + dt : 0;
+        if (!racing || sp < DRIFT_MIN_SPEED * 0.75 || c.driftCounter > 0.25 || c.driftIdle > 0.7 || c.offroad || air) {
+            c.drifting = false;
+            if (c.driftTime >= 1.0 && (c.msgTimer <= 0 || c.msg.rfind("DRIFT", 0) == 0)) {
+                char buf[32];
+                std::snprintf(buf, sizeof buf, "DRIFT %.1f s", c.driftTime);
+                c.msg = buf;
+                c.msgTimer = 1.4;
+            }
+        }
+    }
+    c.driftVis += ((c.drifting ? c.driftDir : 0) - c.driftVis) * std::min(1.0, dt * 6);
+
+    // ---- nitrous: hold the button (with the throttle down) until the bar is empty; it refills slowly, and
+    // faster while drifting
+    bool boost = in.nitro && racing && c.nitro > 0 && in.throttle > 0.1;
+    if (boost && !c.boosting) audio.play(SFX_NITRO);
+    c.boosting = boost;
+    if (boost) c.nitro = std::max(0.0, c.nitro - dt / NITRO_TIME);
+    else c.nitro = std::min(1.0, c.nitro + dt / NITRO_RECHARGE);
+    if (c.drifting) c.nitro = std::min(1.0, c.nitro + dt * DRIFT_NITRO);
+    c.boostVis += ((boost ? 1.0 : 0.0) - c.boostVis) * std::min(1.0, dt * 4);
 
     // steering + centrifugal force (as in Jake Gordon's / Outrun style pseudo 3D); little grip in the air,
     // less grip and more sliding on dirt
@@ -278,9 +326,11 @@ void Race::updateHuman(Car& c, const PlayerInput& inRaw, double dt) {
     // keeps drifting the way it was going
     double grip = (dirt ? DIRT_GRIP : 1.0) * st.grip;
     double wanted = in.steer * 2.0 * std::min(1.0, sp * 1.8) * grip;
+    if (c.drifting)   // more bite, and the car keeps turning into the drift unless you countersteer
+        wanted = std::clamp(in.steer + DRIFT_PULL * c.driftDir, -1.0, 1.0) * 2.0 * std::min(1.0, sp * 1.8) * grip * DRIFT_STEER;
     if (!air) c.vx += (wanted - c.vx) * std::min(1.0, dt * LATERAL_RESP * (0.6 + 0.4 * grip));
     c.x += c.vx * dt;
-    if (!air) c.x -= dt * 2.0 * sp * sp * seg.curve * CENTRIFUGAL * (dirt ? DIRT_SLIDE : 1.0) / st.grip;
+    if (!air) c.x -= dt * 2.0 * sp * sp * seg.curve * CENTRIFUGAL * (dirt ? DIRT_SLIDE : 1.0) / st.grip * (c.drifting ? DRIFT_HOLD : 1.0);
     c.steerVis += (in.steer - c.steerVis) * std::min(1.0, dt * 8);
 
     // gearbox
@@ -302,8 +352,11 @@ void Race::updateHuman(Car& c, const PlayerInput& inRaw, double dt) {
         // and the rev limiter cuts in at the top of each gear
         double power = in.throttle;
         if (man) power *= std::clamp(0.35 + rpm * 0.9, 0.35, 1.0);
-        if (rpm >= 1.0) power = 0;
+        const double limiter = c.boosting ? NITRO_TOP : 1.0;      // nitrous pushes past the rev limiter
+        if (rpm >= limiter) power = 0;
         double a = carAccel(st, sp, power, dirt, c.offroad, track.groundSlope(c.dist));
+        if (c.boosting && rpm < limiter) a += NITRO_ACCEL;
+        if (c.drifting) a -= DRIFT_SCRUB;
         if (in.throttle > 0.05 && rpm >= 1.0) a = std::max(a, -0.01);   // sitting on the limiter, not braking
         a -= BRAKE_DECEL * in.brake;
         if (man && rpm > 1.02 && c.gear < NUM_GEARS - 1) a -= 0.15;  // over-rev engine braking (manual downshift)
@@ -312,7 +365,7 @@ void Race::updateHuman(Car& c, const PlayerInput& inRaw, double dt) {
     c.speed = std::clamp(c.speed, 0.0, MAX_SPEED * OVERSPEED);
     c.x = std::clamp(c.x, -w - 1.6, w + 1.6);
 
-    double targetRpm = std::max(0.15, std::min(1.08, c.speed / (gearTop(c.gear) * st.top)));
+    double targetRpm = std::max(0.15, std::min(c.boosting ? 1.18 : 1.08, c.speed / (gearTop(c.gear) * st.top)));
     if (c.speed < 200) targetRpm = std::max(targetRpm, 0.15 + in.throttle * 0.6);
     if (air) targetRpm = std::min(1.08, targetRpm + 0.25 * in.throttle);   // free-spinning wheels
     c.rpm += (targetRpm - c.rpm) * std::min(1.0, dt * 10);
@@ -320,6 +373,7 @@ void Race::updateHuman(Car& c, const PlayerInput& inRaw, double dt) {
     double corner = std::fabs(seg.curve) * sp * sp;
     c.skid = (!c.offroad && !air && corner > 2.0 && std::fabs(in.steer) > 0.4) ? std::min(1.0, (corner - 2.0) / 2.5 + 0.3) : 0;
     if (!c.offroad && !air && in.brake > 0.5 && sp > 0.55) c.skid = std::max(c.skid, 0.6);
+    if (c.drifting && !air) c.skid = 1.0;
     if (dirt) c.skid = 0;     // no tyre squeal on loose ground (the gravel rumble plays instead)
 
     auto crash = [&]() {

@@ -48,6 +48,14 @@ struct Car {
     bool airborne = false;
     double airTime = 0, landTimer = 0;
     bool inTunnel = false;
+    // drift (see DRIFT_* in config.h): driftDir -1 / +1 while drifting, driftVis the smoothed swing of the tail
+    bool drifting = false;
+    int driftDir = 0;
+    double driftTime = 0, driftVis = 0, driftCounter = 0, driftIdle = 0, brakeTap = 0;   // brakeTap: how long the brake is held
+    bool brakeWas = false;
+    // nitrous: bar 0..1, boosting while the button is held; boostVis is the smoothed effect (camera, flames)
+    double nitro = 1.0, boostVis = 0;
+    bool boosting = false;
     bool onDirt = false;
     double lastBonus = 0;
     std::string msg; double msgTimer = 0; double msgFlash = 0;

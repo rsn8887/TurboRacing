@@ -4,6 +4,62 @@ frame 560 408
 # car/brake <yaw step> <elevation>  x y w h  ox oy scale   (yaw step * 2.5 deg to the right, mirrored for the left; brake = lit brake lights drawn over the car)
 # glare <yaw step -8..8> <elevation>: reflections on the glass, drawn over the car (never mirrored)
 # shadow <yaw step -8..8> <shadow elevation 0-2 = car elevations 1, 3, 5>: the shadow on the road
+# exhaust <yaw step> <elevation>  x y  x y ...: the exhaust pipes in that car frame, as fractions of the whole
+#   frame (0..1); the nitrous flames come out there
+exhaust 0 0  0.4730 0.7989  0.5270 0.7989
+exhaust 0 1  0.4730 0.8171  0.5270 0.8171
+exhaust 0 2  0.4730 0.8385  0.5270 0.8385
+exhaust 0 3  0.4730 0.8632  0.5270 0.8632
+exhaust 0 4  0.4731 0.8877  0.5269 0.8877
+exhaust 0 5  0.4731 0.9121  0.5269 0.9121
+exhaust 1 0  0.4481 0.7989  0.5020 0.7990
+exhaust 1 1  0.4481 0.8170  0.5020 0.8172
+exhaust 1 2  0.4481 0.8383  0.5020 0.8387
+exhaust 1 3  0.4482 0.8627  0.5020 0.8634
+exhaust 1 4  0.4482 0.8872  0.5020 0.8881
+exhaust 1 5  0.4483 0.9114  0.5020 0.9125
+exhaust 2 0  0.4234 0.7989  0.4770 0.7990
+exhaust 2 1  0.4233 0.8168  0.4770 0.8173
+exhaust 2 2  0.4233 0.8379  0.4770 0.8388
+exhaust 2 3  0.4234 0.8622  0.4770 0.8636
+exhaust 2 4  0.4235 0.8864  0.4771 0.8883
+exhaust 2 5  0.4236 0.9104  0.4771 0.9128
+exhaust 3 0  0.3988 0.7988  0.4521 0.7990
+exhaust 3 1  0.3988 0.8165  0.4521 0.8173
+exhaust 3 2  0.3988 0.8374  0.4521 0.8388
+exhaust 3 3  0.3988 0.8614  0.4521 0.8636
+exhaust 3 4  0.3990 0.8854  0.4522 0.8883
+exhaust 3 5  0.3991 0.9092  0.4523 0.9127
+exhaust 4 0  0.3745 0.7988  0.4273 0.7990
+exhaust 4 1  0.3745 0.8163  0.4273 0.8173
+exhaust 4 2  0.3745 0.8369  0.4273 0.8387
+exhaust 4 3  0.3745 0.8606  0.4274 0.8634
+exhaust 4 4  0.3747 0.8843  0.4274 0.8881
+exhaust 4 5  0.3749 0.9078  0.4276 0.9125
+exhaust 5 0  0.3505 0.7988  0.4027 0.7990
+exhaust 5 1  0.3505 0.8160  0.4027 0.8172
+exhaust 5 2  0.3505 0.8363  0.4027 0.8386
+exhaust 5 3  0.3506 0.8596  0.4028 0.8631
+exhaust 5 4  0.3507 0.8829  0.4029 0.8877
+exhaust 5 5  0.3510 0.9061  0.4030 0.9120
+exhaust 6 0  0.3269 0.7987  0.3784 0.7990
+exhaust 6 1  0.3268 0.8156  0.3783 0.8171
+exhaust 6 2  0.3269 0.8356  0.3783 0.8383
+exhaust 6 3  0.3269 0.8585  0.3784 0.8627
+exhaust 6 4  0.3271 0.8814  0.3786 0.8871
+exhaust 6 5  0.3274 0.9042  0.3788 0.9112
+exhaust 7 0  0.3037 0.7987  0.3543 0.7991
+exhaust 7 1  0.3037 0.8152  0.3543 0.8169
+exhaust 7 2  0.3037 0.8348  0.3543 0.8379
+exhaust 7 3  0.3038 0.8573  0.3544 0.8621
+exhaust 7 4  0.3040 0.8797  0.3545 0.8863
+exhaust 7 5  0.3043 0.9021  0.3548 0.9102
+exhaust 8 0  0.2811 0.7986  0.3307 0.7991
+exhaust 8 1  0.2810 0.8148  0.3306 0.8167
+exhaust 8 2  0.2810 0.8339  0.3306 0.8375
+exhaust 8 3  0.2811 0.8559  0.3307 0.8614
+exhaust 8 4  0.2813 0.8779  0.3309 0.8853
+exhaust 8 5  0.2817 0.8998  0.3312 0.9090
 car 0 0  1137 958 264 175  148 180 1
 brake 0 0  3074 1809 42 15  260 180 1
 brake 0 0  1 1809 225 22  164 276 1

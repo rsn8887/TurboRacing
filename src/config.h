@@ -4,7 +4,7 @@
 
 #define GAME_TITLE   "Turbo Racing Mayhem"
 #ifndef GAME_VERSION
-#define GAME_VERSION "1.2.0"     // set by CMake from project(... VERSION)
+#define GAME_VERSION "1.3.0"     // set by CMake from project(... VERSION)
 #endif
 
 // Internal framebuffer (16:9, scales 2x to 720p and 3x to 1080p)
@@ -60,6 +60,20 @@ constexpr double OVERSPEED     = 1.15;    // downhill you can go this much faste
 constexpr double GRAVITY       = 6000.0;  // free fall in world units / s^2: jumps hang ~1 s on smooth parabolas
 constexpr double TAKEOFF_ACCEL = GRAVITY * 4.5;   // suspension + downforce keep you on the road over gentle crests
 constexpr int    NUM_GEARS     = 5;
+// Drift (OutRun 2 style): tap the brake while steering hard at speed and keep the throttle down. The car swings
+// its tail out and holds a tighter line through bends with little loss of speed; it fills the nitro bar.
+constexpr double DRIFT_MIN_SPEED = 0.45;  // fraction of MAX_SPEED needed to start a drift (~130 km/h)
+constexpr double DRIFT_TAP       = 0.35;  // a brake press shorter than this (s) is a tap: letting go starts the drift
+constexpr double DRIFT_HOLD      = 0.45;  // centrifugal push while drifting (x normal): the car holds its line
+constexpr double DRIFT_STEER     = 1.35;  // extra steering authority while drifting
+constexpr double DRIFT_PULL      = 0.30;  // the car keeps turning into the drift on its own (fraction of full lock)
+constexpr double DRIFT_SCRUB     = 0.020; // speed lost while drifting (fraction of MAX_SPEED per second)
+constexpr double DRIFT_NITRO     = 0.14;  // nitro gained per second of drifting (full bar = 1)
+// Nitrous: hold the nitro button for a big push and a higher top speed until the bar is empty; it refills slowly
+constexpr double NITRO_ACCEL     = 0.13;  // extra acceleration (fraction of MAX_SPEED per second)
+constexpr double NITRO_TOP       = 1.15;  // the rev limiter lets you go this far past the gear's top speed
+constexpr double NITRO_TIME      = 3.5;   // a full bar lasts this long (s)
+constexpr double NITRO_RECHARGE  = 28.0;  // an empty bar refills in this long without drifting (s)
 // time limits: this much longer than a perfect driver needs (the first leg, with the standing start from the back
 // of the grid and the traffic, gets more)
 constexpr double TIME_SLACK_START = 1.28;

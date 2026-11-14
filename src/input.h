@@ -8,6 +8,7 @@ struct PlayerInput {
     double throttle = 0;    // 0..1
     double brake = 0;       // 0..1
     bool shiftUp = false, shiftDown = false;   // edges (manual gears)
+    bool nitro = false;                        // held: boost with nitrous
 };
 
 struct MenuInput {

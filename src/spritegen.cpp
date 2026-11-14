@@ -1297,6 +1297,26 @@ void Graphics::generate() {
     lightRed = makeLight(rgb(255, 40, 30), true);
     lightGreen = makeLight(rgb(60, 255, 80), true);
     lightOff = makeLight(rgb(255, 40, 30), false);
+    {   // nitrous flame: white-hot core, cyan and blue, a violet fringe; streaks radiate from the centre
+        const int N = 32;
+        Bitmap f(N, N);
+        for (int y = 0; y < N; ++y)
+            for (int x = 0; x < N; ++x) {
+                double dx = (x + 0.5 - N / 2.0) / (N / 2.0), dy = (y + 0.5 - N / 2.0) / (N / 2.0);
+                double d = std::sqrt(dx * dx + dy * dy), ang = std::atan2(dy, dx);
+                double ray = 0.82 + 0.18 * std::sin(ang * 7 + 1.3) * std::sin(ang * 3);   // ragged edge
+                double r = d / ray;
+                if (r >= 1) continue;
+                Color c = r < 0.22 ? rgb(255, 255, 255)
+                        : r < 0.45 ? lerpColor(rgb(255, 255, 255), rgb(120, 230, 255), (r - 0.22) / 0.23)
+                        : r < 0.75 ? lerpColor(rgb(120, 230, 255), rgb(40, 110, 255), (r - 0.45) / 0.30)
+                                   : lerpColor(rgb(40, 110, 255), rgb(150, 60, 255), (r - 0.75) / 0.25);
+                double a = r < 0.45 ? 1.0 : std::pow(1 - (r - 0.45) / 0.55, 1.4);
+                f.px[size_t(y) * N + x] = withAlpha(c, int(a * 255));
+            }
+        f.buildMips();
+        flame = f;
+    }
 
     // 0 coast
     bg[0].push_back(cloudLayer(9, rgb(255, 255, 255), 0.05, -70));

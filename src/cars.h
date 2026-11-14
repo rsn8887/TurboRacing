@@ -1,6 +1,7 @@
 // Car models: six procedurally painted body types, each with steering and hill-pitch frames.
 // Bases are painted once in a neutral grey with a "paint" mask, then recoloured per car colour on demand.
 #pragma once
+#include <array>
 #include <vector>
 #include <utility>
 #include "canvas.h"
@@ -61,6 +62,8 @@ struct CarSprites {
     // the car's shadow on the road for yaw steps -(CAR_YAWS-1)..(CAR_YAWS-1) (index + CAR_YAWS-1): not mirrored,
     // because the sun stays on the same side
     CarFrame shadow[2 * CAR_YAWS - 1][CAR_SHADOW_ELEV];
+    // where the exhaust pipes are in each car frame (turned right), as fractions of the whole frame
+    std::vector<std::array<double, 2>> exhaust[CAR_YAWS][CAR_ELEV];
 };
 
 CarSprites& carSprites(int type);
@@ -70,6 +73,8 @@ void prepareCarSprites();      // after loading / generating: mipmaps, bounds, p
 // (negative = turned left, mirrored), elevation index, brake lights on/off
 void drawCar(Canvas& cv, int type, Color color, int yawIdx, int elev, bool brake, double x, double y, double w, double h,
              double clipBottom = 1e9, double fog = 0, Color fogColor = 0);
+// the screen positions of its exhaust pipes, for a car drawn with the same arguments (nitrous flames)
+void carExhausts(int type, int yawIdx, int elev, double x, double y, double w, double h, std::vector<std::array<double, 2>>& out);
 // its shadow, in the same frame rectangle (put the frame's ground line where the shadow falls)
 void drawCarShadow(Canvas& cv, int type, int yawIdx, int elev, double x, double y, double w, double h,
                    double clipBottom, double alpha);

@@ -69,10 +69,8 @@ void Input::handleEvent(const SDL_Event& e, int numPlayers) {
         case SDL_CONTROLLER_BUTTON_A: menu.confirm = true; break;
         case SDL_CONTROLLER_BUTTON_B: menu.back = true; break;
         case SDL_CONTROLLER_BUTTON_START: menu.pause = true; menu.confirm = true; break;
-        case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:
-        case SDL_CONTROLLER_BUTTON_Y: shiftUp_[pl] = true; break;
-        case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:
-        case SDL_CONTROLLER_BUTTON_X: shiftDown_[pl] = true; break;
+        case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER: shiftUp_[pl] = true; break;
+        case SDL_CONTROLLER_BUTTON_LEFTSHOULDER: shiftDown_[pl] = true; break;
         default: break;
         }
         break;
@@ -96,15 +94,18 @@ PlayerInput Input::player(int index, int numPlayers) {
     PlayerInput in;
     const Uint8* k = SDL_GetKeyboardState(nullptr);
     double l = 0, r = 0, acc = 0, brk = 0;
+    bool nos = false;
     bool arrows = index == 0;
     bool wasd = (index == 1) || numPlayers == 1;
     if (arrows) {
         l += k[SDL_SCANCODE_LEFT]; r += k[SDL_SCANCODE_RIGHT];
         acc += k[SDL_SCANCODE_UP]; brk += k[SDL_SCANCODE_DOWN];
+        nos |= k[SDL_SCANCODE_SPACE] != 0;
     }
     if (wasd) {
         l += k[SDL_SCANCODE_A]; r += k[SDL_SCANCODE_D];
         acc += k[SDL_SCANCODE_W]; brk += k[SDL_SCANCODE_S];
+        nos |= k[SDL_SCANCODE_LSHIFT] || k[SDL_SCANCODE_TAB];
     }
     for (size_t i = 0; i < pads_.size(); ++i) {
         int pl = numPlayers > 1 ? int(std::min<size_t>(i, 1)) : 0;
@@ -118,10 +119,12 @@ PlayerInput Input::player(int index, int numPlayers) {
         brk += SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_B);
         acc += SDL_GameControllerGetAxis(c, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) / 32767.0;
         brk += SDL_GameControllerGetAxis(c, SDL_CONTROLLER_AXIS_TRIGGERLEFT) / 32767.0;
+        nos |= SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_X) || SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_Y);
     }
     in.steer = std::clamp(r - l, -1.0, 1.0);
     in.throttle = std::clamp(acc, 0.0, 1.0);
     in.brake = std::clamp(brk, 0.0, 1.0);
+    in.nitro = nos;
     if (index < 2) {
         in.shiftUp = shiftUp_[index]; in.shiftDown = shiftDown_[index];
         shiftUp_[index] = shiftDown_[index] = false;
