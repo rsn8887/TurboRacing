@@ -302,12 +302,23 @@ bool saveAssets(const std::string& dir, const Graphics& g0, const CarSprites car
             "# shadow <yaw step -8..8> <shadow elevation 0-2 = car elevations 1, 3, 5>: the shadow on the road",
             "# exhaust <yaw step> <elevation>  x y  x y ...: the exhaust pipes in that car frame, as fractions of the whole",
             "#   frame (0..1); the nitrous flames come out there",
+            "# tyres <yaw step> <elevation>  x y  x y: where the rear tyres touch the road (tyre smoke), same units",
         };
         for (int s = 0; s < CAR_YAWS; ++s)
             for (int e = 0; e < CAR_ELEV; ++e) {
                 std::string l = "exhaust " + std::to_string(s) + " " + std::to_string(e);
                 char buf[32];
                 for (const auto& p : cs.exhaust[s][e]) {
+                    std::snprintf(buf, sizeof buf, "  %.4f %.4f", p[0], p[1]);
+                    l += buf;
+                }
+                extra.push_back(l);
+            }
+        for (int s = 0; s < CAR_YAWS; ++s)
+            for (int e = 0; e < CAR_ELEV; ++e) {
+                std::string l = "tyres " + std::to_string(s) + " " + std::to_string(e);
+                char buf[32];
+                for (const auto& p : cs.tyres[s][e]) {
                     std::snprintf(buf, sizeof buf, "  %.4f %.4f", p[0], p[1]);
                     l += buf;
                 }
@@ -390,7 +401,7 @@ bool loadAssets(const std::string& dir, Graphics& g, std::string& err) {
         CarSprites& cs = carSprites(t);
         int fw = CAR_BMP_W, fh = CAR_BMP_H;
         for (int s = 0; s < CAR_YAWS; ++s)
-            for (int e = 0; e < CAR_ELEV; ++e) { cs.car[s][e] = CarFrame(); cs.brake[s][e].clear(); cs.exhaust[s][e].clear(); }
+            for (int e = 0; e < CAR_ELEV; ++e) { cs.car[s][e] = CarFrame(); cs.brake[s][e].clear(); cs.exhaust[s][e].clear(); cs.tyres[s][e].clear(); }
         for (auto& row : cs.glare)
             for (auto& v : row) v.clear();
         int found = 0;
@@ -400,6 +411,12 @@ bool loadAssets(const std::string& dir, Graphics& g, std::string& err) {
                 int s = std::stoi(l[1]), e = std::stoi(l[2]);
                 if (s < 0 || s >= CAR_YAWS || e < 0 || e >= CAR_ELEV) continue;
                 for (size_t i = 3; i + 1 < l.size(); i += 2) cs.exhaust[s][e].push_back({std::stod(l[i]), std::stod(l[i + 1])});
+                continue;
+            }
+            if (l[0] == "tyres" && l.size() >= 3) {
+                int s = std::stoi(l[1]), e = std::stoi(l[2]);
+                if (s < 0 || s >= CAR_YAWS || e < 0 || e >= CAR_ELEV) continue;
+                for (size_t i = 3; i + 1 < l.size(); i += 2) cs.tyres[s][e].push_back({std::stod(l[i]), std::stod(l[i + 1])});
                 continue;
             }
             if ((l[0] != "car" && l[0] != "brake" && l[0] != "shadow" && l[0] != "glare") || l.size() < 10) continue;

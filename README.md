@@ -19,7 +19,7 @@ A pseudo-3D arcade racer in the style of Outrun and Lotus Esprit Turbo Challenge
 
 **Drift:** tap the brake while steering into a bend at speed (over about 130 km/h) and keep the throttle down. The tail swings out and the car holds a tighter line with little loss of speed. Countersteer or straighten up to end it.
 
-**Nitro:** hold the nitro button for a burst of power and a higher top speed until the bar (bottom left) is empty. It refills slowly on its own and much faster while you drift.
+**Nitro:** once the bar (bottom left) is full, hold the nitro button for a burst of power and a higher top speed until the bar is empty or you let go. It can only be fired again when the bar is full; it refills slowly on its own and much faster while you drift. The CPU drivers use nitro and drift too.
 
 F11 or Alt+Enter toggles fullscreen.
 

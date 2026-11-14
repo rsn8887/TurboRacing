@@ -64,6 +64,8 @@ struct CarSprites {
     CarFrame shadow[2 * CAR_YAWS - 1][CAR_SHADOW_ELEV];
     // where the exhaust pipes are in each car frame (turned right), as fractions of the whole frame
     std::vector<std::array<double, 2>> exhaust[CAR_YAWS][CAR_ELEV];
+    // where the rear tyres touch the road in each car frame (turned right), as fractions of the whole frame
+    std::vector<std::array<double, 2>> tyres[CAR_YAWS][CAR_ELEV];
 };
 
 CarSprites& carSprites(int type);
@@ -75,6 +77,8 @@ void drawCar(Canvas& cv, int type, Color color, int yawIdx, int elev, bool brake
              double clipBottom = 1e9, double fog = 0, Color fogColor = 0);
 // the screen positions of its exhaust pipes, for a car drawn with the same arguments (nitrous flames)
 void carExhausts(int type, int yawIdx, int elev, double x, double y, double w, double h, std::vector<std::array<double, 2>>& out);
+// the screen positions where its rear tyres touch the road (tyre smoke)
+void carTyres(int type, int yawIdx, int elev, double x, double y, double w, double h, std::vector<std::array<double, 2>>& out);
 // its shadow, in the same frame rectangle (put the frame's ground line where the shadow falls)
 void drawCarShadow(Canvas& cv, int type, int yawIdx, int elev, double x, double y, double w, double h,
                    double clipBottom, double alpha);

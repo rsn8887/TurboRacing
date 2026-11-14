@@ -52,6 +52,9 @@ const MatDef MATS[] = {
 struct Tex { Bitmap bmp; std::vector<unsigned char> mask; };
 struct Tri { V3 p[3]; double u[3] = {0, 0, 0}, v[3] = {0, 0, 0}; int mat = M_BODY; const Tex* tex = nullptr; };
 
+// the rear tyres' contact points with the road (x, z) of the model being built: tyre smoke starts there
+thread_local std::vector<std::pair<double, double>> g_tyres;
+
 struct Mesh {
     std::vector<Tri> tris;
     void tri(V3 a, V3 b, V3 c, int mat, const Tex* tex = nullptr, std::array<double, 6> uv = {0, 0, 0, 0, 0, 0}) {
@@ -82,6 +85,7 @@ struct Mesh {
     // cylinder along the x axis (wheels) or z axis (spare wheel); 'out' = which cap shows the rim
     void wheel(V3 c, double r, double w, bool alongZ, int outSign) {
         const int n = 18;
+        if (!alongZ && c.z < 0) g_tyres.push_back({c.x, c.z});   // a rear road wheel (not the spare)
         auto P = [&](double a, double off, double rr) -> V3 {
             double s = std::sin(a) * rr, co = std::cos(a) * rr;
             return alongZ ? V3{c.x + co, c.y + s, c.z + off} : V3{c.x + off, c.y + s, c.z + co};
@@ -274,6 +278,7 @@ struct Model {
     Mesh mesh;
     double rearAxleZ = -130;
     std::vector<V3> exhausts;                // the exhaust pipe openings (see g_pipes)
+    std::vector<V3> tyres;                   // where the rear tyres touch the road (see g_tyres)
     std::vector<std::unique_ptr<Tex>> texs;
     const Tex* add(Tex t) { texs.push_back(std::make_unique<Tex>(std::move(t))); return texs.back().get(); }
 };
@@ -928,8 +933,10 @@ void generateCarSprites(CarSprites out[CAR_TYPES]) {
                 for (auto& m : models[type]) m = Model();
                 g_glare = false;
                 g_pipes.clear();
+                g_tyres.clear();
                 BUILD[type](models[type][0], false);
                 for (auto& p : g_pipes) models[type][0].exhausts.push_back({p.first, p.second, g_tailZ - 2});
+                for (auto& p : g_tyres) models[type][0].tyres.push_back({p.first, 0, p.second});
                 BUILD[type](models[type][1], true);
                 g_glare = true;
                 BUILD[type](models[type][2], false);
@@ -975,6 +982,7 @@ void generateCarSprites(CarSprites out[CAR_TYPES]) {
                     for (Base& o : diffOverlays(il[0], il[1], ml[1], mirroredX, car.oy)) gl.push_back(toFrame(std::move(o)));
                 }
                 cs.exhaust[s][pi] = projectPoints(model[0], yaw, el, model[0].exhausts);
+                cs.tyres[s][pi] = projectPoints(model[0], yaw, el, model[0].tyres);
                 if (pi % 2 == 1)    // shadows for elevations 1, 3, 5, turned right (s) and left (-s)
                     for (int sg : {1, -1}) {
                         if (s == 0 && sg < 0) continue;

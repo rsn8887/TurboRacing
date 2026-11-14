@@ -74,6 +74,10 @@ constexpr double NITRO_ACCEL     = 0.13;  // extra acceleration (fraction of MAX
 constexpr double NITRO_TOP       = 1.15;  // the rev limiter lets you go this far past the gear's top speed
 constexpr double NITRO_TIME      = 3.5;   // a full bar lasts this long (s)
 constexpr double NITRO_RECHARGE  = 28.0;  // an empty bar refills in this long without drifting (s)
+// CPU drivers use the same nitro bar and drift (how often depends on the difficulty, see race.cpp)
+constexpr double AI_NITRO_WAIT   = 9.0;   // average wait (s, Medium) with a full bar before firing on a clear stretch
+constexpr double AI_DRIFT_MIN    = 2.0;   // a CPU car only drifts through bends at least this sharp
+constexpr double AI_DRIFT_CORNER = 1.07;  // drifting lets a CPU car carry this much more speed through the bend
 // time limits: this much longer than a perfect driver needs (the first leg, with the standing start from the back
 // of the grid and the traffic, gets more)
 constexpr double TIME_SLACK_START = 1.28;

@@ -28,6 +28,7 @@ struct Proj {
 // per thread (strips are rendered in parallel). Kept on the heap: big thread-local arrays would need a big
 // per-thread TLS block, which some platforms (Switch) don't give their threads.
 thread_local std::vector<Proj> projBuf;
+thread_local std::vector<std::array<double, 2>> g_tyrePts;   // rear tyre contact points of the car drawn last
 thread_local std::vector<double> ceilBuf;   // rows above this are hidden behind nearer tunnel ceilings
 
 inline double fogAt(const Theme& th, double z) {
@@ -365,6 +366,7 @@ void drawCarSprite(Canvas& cv, const Car& c, double cx, double bottom, double gr
     drawCarShadow(cv, c.type, yawIdx, elevIdx, cx - w / 2, groundTop, w, h, shadowClip, sa);
     double top = bottom - h * double(CAR_ANCHOR_Y) / CAR_BMP_H;
     drawCar(cv, c.type, CAR_COLORS[c.color], yawIdx, elevIdx, c.braking, cx - w / 2, top, w, h, clip, fog, fogColor);
+    carTyres(c.type, yawIdx, elevIdx, cx - w / 2, top, w, h, g_tyrePts);   // for the tyre smoke drawn after it
     // nitrous: a flame out of every exhaust pipe, exactly where the pipe is in this frame
     if (c.boostVis > 0.05 && c.crashTimer <= 0) {
         thread_local std::vector<std::array<double, 2>> ex;
@@ -378,6 +380,90 @@ void drawCarSprite(Canvas& cv, const Car& c, double cx, double bottom, double gr
             cv.blitScaled(gfx.flame, x - sz / 2, y - sz / 2, sz, sz, false, clip, 0, 0, c.boostVis);
         }
     }
+}
+
+// Tyre smoke (or dust) from the rear tyres. 'tyres' are the screen points where they touch the road (from
+// drawCarSprite), bw the car's body width on screen.
+void drawTyreSmoke(Canvas& cv, const Bitmap& pb, const std::vector<std::array<double, 2>>& tyres, double cx, double groundY,
+                   double bw, double clip, double t, unsigned seed, double fog, Color fogColor) {
+    std::array<double, 2> fallback[2] = {{cx - bw * 0.38, groundY}, {cx + bw * 0.38, groundY}};
+    const std::array<double, 2>* pts = tyres.size() >= 2 ? tyres.data() : fallback;
+    const int nt = tyres.size() >= 2 ? int(tyres.size()) : 2;
+    const int per = 4;
+    for (int k = 0; k < nt; ++k) {
+        const double side = pts[k][0] < cx ? -1 : 1;
+        for (int i = 0; i < per; ++i) {
+            double ph = t * 3.0 + double(i) / per + k * 0.5 / per;
+            double age = ph - std::floor(ph);
+            unsigned sd = unsigned(std::floor(ph)) * 31 + unsigned(i) * 7 + unsigned(k) * 53 + seed;
+            double x = pts[k][0] + (frand(sd) - 0.5) * bw * 0.1 + side * bw * 0.12 * age;
+            double y = pts[k][1] - bw * 0.04 - bw * 0.27 * age;
+            double sz = bw * (0.16 + 0.26 * age);
+            cv.blitScaled(pb, x - sz / 2, y - sz * 0.6, sz, sz * 0.85, false, clip, fog, fogColor, (1 - age) * 0.9);
+        }
+    }
+}
+
+// Drift sparks: the car scrapes along the road with its tail out, and showers of sparks shoot from under the
+// rear tyres and the floor between them - most from the outer side the tail swings to - out sideways and back
+// towards the camera, arcing down onto the road. Each spark is a short motion streak, white hot at the head and
+// cooling through yellow and orange to red; a flickering glow marks where the car scrapes the road.
+void drawDriftSparks(Canvas& cv, const std::vector<std::array<double, 2>>& tyres, double cx, double groundY, double bw,
+                     double clip, double t, unsigned seed, double driftVis, double dim) {
+    if (bw < 3) return;
+    std::array<double, 2> fallback[2] = {{cx - bw * 0.38, groundY}, {cx + bw * 0.38, groundY}};
+    const std::array<double, 2>* pts = tyres.size() >= 2 ? tyres.data() : fallback;
+    std::array<double, 2> L = pts[0], R = pts[1];
+    if (L[0] > R[0]) std::swap(L, R);
+    const double outer = driftVis > 0 ? -1 : 1;           // the tail swings out opposite to the turn
+    const double strength = std::clamp(std::fabs(driftVis), 0.0, 1.0);
+    const double vis = (1 - dim) * strength;
+    if (vis < 0.05) return;
+    const double th = std::max(1.0, bw * 0.013);         // streak thickness
+    const Rect keep = cv.clip;
+    auto dot = [&](double x, double y, double sz, Color c, double a) {
+        if (y > clip) return;
+        cv.rectBlend(int(std::floor(x - sz / 2)), int(std::floor(y - sz / 2)), std::max(1, int(sz + 0.5)), std::max(1, int(sz + 0.5)), c, a);
+    };
+    // glow where the floor scrapes the road
+    for (int k = 0; k < 2; ++k) {
+        const std::array<double, 2>& p = (k == 0) == (outer < 0) ? L : R;
+        double fl = 0.6 + 0.4 * frand(unsigned(t * 60) * 13 + unsigned(k) * 7 + seed);
+        double sz = bw * (k == 0 ? 0.2 : 0.11) * fl;   // a flat hot spot on the road under the tyre
+        cv.blitScaled(gfx.spark, p[0] - sz / 2, p[1] - sz * 0.2, sz, sz * 0.35, false, clip, 0, 0, std::min(1.0, 0.9 * vis * fl));
+    }
+    const int N = bw > 60 ? 64 : bw > 20 ? 24 : 8;        // fewer for distant cars
+    for (int i = 0; i < N; ++i) {
+        const double life = 0.32 + 0.22 * frand(unsigned(i) * 97 + seed);
+        double ph = t / life + double(i) / N;
+        double cyc = std::floor(ph), age = ph - cyc;
+        unsigned sd = unsigned(cyc) * 131 + unsigned(i) * 17 + seed;
+        double r1 = frand(sd), r2 = frand(sd + 1), r3 = frand(sd + 2), r4 = frand(sd + 3);
+        // where it starts: 70% at the outer tyre, the rest along the floor between the tyres
+        double u = r1 < 0.7 ? (outer < 0 ? 0.0 : 1.0) + (r4 - 0.5) * 0.15 : r4;
+        u = std::clamp(u, 0.0, 1.0);
+        double ox = L[0] + (R[0] - L[0]) * u, oy = L[1] + (R[1] - L[1]) * u - bw * 0.01;
+        // velocity (body widths per second): out to the swinging side, back towards us, a little up
+        double vx = (outer * (0.8 + 2.4 * r2) + (r3 - 0.5) * 1.2) * bw;
+        double vy = (-(0.3 + 1.1 * r3) + 0.9 * r2) * bw;
+        const double g = 5.5 * bw;
+        auto pos = [&](double tt) { return std::array<double, 2>{ox + vx * tt, oy + vy * tt + 0.5 * g * tt * tt}; };
+        double ts = age * life;
+        std::array<double, 2> head = pos(ts), tail = pos(std::max(0.0, ts - 0.045));
+        // colour: white hot, then yellow, orange, red as it cools
+        Color c = age < 0.25 ? lerpColor(rgb(255, 255, 235), rgb(255, 225, 90), age / 0.25)
+                : age < 0.6  ? lerpColor(rgb(255, 225, 90), rgb(255, 130, 30), (age - 0.25) / 0.35)
+                             : lerpColor(rgb(255, 130, 30), rgb(200, 40, 10), (age - 0.6) / 0.4);
+        double a = vis * (age > 0.7 ? (1 - age) / 0.3 : 1.0);
+        double dx = head[0] - tail[0], dy = head[1] - tail[1];
+        int steps = std::max(1, int(std::max(std::fabs(dx), std::fabs(dy))));
+        for (int k = 0; k <= steps; ++k) {
+            double f = double(k) / steps;                  // 0 tail .. 1 head
+            dot(tail[0] + dx * f, tail[1] + dy * f, th, c, a * (0.25 + 0.75 * f));
+        }
+        dot(head[0], head[1], th * 1.8, rgb(255, 250, 220), a * 0.9);   // hot head
+    }
+    cv.setClip(keep);
 }
 
 void hudPanel(UiCanvas& cv, double x, double y, double w, double h) {
@@ -452,19 +538,36 @@ void drawHud(Canvas& canvas, const Rect& vpPx, const Race& race, int idx, int fr
         if (litSeg) cv.vgradRect(x, y, w, h, shade(col, 1.25), shade(col, 0.6));
         else cv.vgradRect(x, y, w, h, rgb(50, 54, 70), rgb(24, 26, 36));
     }
-    // nitrous: drains while boosting, refills slowly and faster while drifting; flashes while in use
+    // nitrous: drains while boosting, refills slowly and faster while drifting; flashes while in use. It can
+    // only be fired from a full bar, so while it refills the bar is dimmed and the label greyed out.
     {
         bool flash = c.boosting && (frame / 4) % 2;
+        bool charging = !c.boosting && c.nitro < 1.0;
+        // full and ready: the bar pulses with a soft halo and a shine sweeps along it, the label glows
+        bool ready = !c.boosting && c.nitro >= 1.0;
+        double pulse = ready ? 0.5 + 0.5 * std::sin(frame * 0.1) : 0;
         double ny = byy - 15 * f, nh = 7 * f;
-        text.draw("N2O", bx, ny - 2.5 * f, styleUI(8.5 * f, c.boosting ? rgb(140, 240, 255) : yellow));
+        Color label = c.boosting ? rgb(140, 240, 255) : charging ? rgb(130, 134, 150) : lerpColor(yellow, rgb(255, 255, 215), pulse);
+        text.draw("N2O", bx, ny - 2.5 * f, styleUI(8.5 * f, label));
         double gx = bx + 26 * f, gw = segs * (sw + gap) - gap - 26 * f;
         int n = 12;
         double cw = (gw + gap) / n;
+        if (ready)
+            for (int k = 1; k <= 3; ++k)
+                cv.rectBlend(int(gx - 1.5 * k * f), int(ny - 1.5 * k * f), int(gw + 3 * k * f), int(nh + 3 * k * f),
+                             rgb(90, 220, 255), (0.06 + 0.14 * pulse) * (4 - k) / 3);
+        const double sweep = ready ? std::fmod(frame * 0.35, n + 14.0) - 2 : -99;   // shine position (segments)
         for (int i = 0; i < n; ++i) {
             double fr = double(i) / n;
             bool on = c.nitro > fr + 0.5 / n;
             Color col = lerpColor(rgb(80, 230, 255), rgb(70, 100, 255), fr);
             if (flash) col = shade(col, 1.35);
+            if (charging) col = shade(col, 0.5);
+            if (ready) {
+                col = shade(col, 1.0 + 0.3 * pulse);
+                double shine = std::max(0.0, 1 - std::fabs(i - sweep) / 1.5);
+                if (shine > 0) col = lerpColor(col, rgb(255, 255, 255), 0.7 * shine);
+            }
             int x = int(gx + i * cw), y = int(ny), w = std::max(1, int(cw - gap)), h = std::max(2, int(nh));
             if (on) cv.vgradRect(x, y, w, h, shade(col, 1.25), shade(col, 0.6));
             else cv.vgradRect(x, y, w, h, rgb(50, 54, 70), rgb(24, 26, 36));
@@ -641,7 +744,7 @@ void renderView(Canvas& cv, const Rect& vp, const Race& race, int carIndex, cons
     // Tunnel lamps are collected while the walls are drawn and drawn last, each one only if no nearer tunnel
     // wall (or the wall around a tunnel entrance) is in front of it. Drawing them in the normal far-to-near
     // order would let the next wall pieces cut a hard edge into their glow.
-    struct Lamp { double hx0, hx1, hy0, hy1, lx, ly, size, dark, alpha; Rect clip; double clipBottom; int n; };
+    struct Lamp { double hx0, hx1, hy0, hy1, lx, ly, size, dark, alpha; Rect clip; double clipBottom; int n; bool done = false; };
     std::vector<Lamp> lamps;
     struct WallQuad { double xa, yaTop, yaBot, xb, ybTop, ybBot; int n; };   // a wall piece, near (a) to far (b)
     std::vector<WallQuad> wallQuads;
@@ -660,17 +763,29 @@ void renderView(Canvas& cv, const Rect& vp, const Race& race, int carIndex, cons
             if (o.n < L.n && (L.lx < o.xl || L.lx > o.xr || L.ly < o.yTop || L.ly > o.yBot)) return true;
         return false;
     };
-    auto drawLamps = [&] {
+    auto drawLamp = [&](Lamp& L) {
+        L.done = true;
+        if (lampHidden(L)) return;
         Rect keep = cv.clip;
-        for (const Lamp& L : lamps) {           // far to near
-            if (lampHidden(L)) continue;
-            cv.setClip(L.clip);
-            Color housing = lerpColor(rgb(70, 70, 76), TUNNEL_BLACK, L.dark * 0.8);
-            for (int x = int(std::floor(L.hx0)); x <= int(std::ceil(L.hx1)); ++x) cv.vspanAA(x, L.hy0, L.hy1, housing, L.clipBottom);
-            cv.blitScaled(gfx.lampGlow, L.lx - L.size / 2, L.ly - L.size / 2, L.size, L.size, false, L.clipBottom, 0, 0, L.alpha);
-        }
-        lamps.clear();
+        cv.setClip(L.clip);
+        Color housing = lerpColor(rgb(70, 70, 76), TUNNEL_BLACK, L.dark * 0.8);
+        for (int x = int(std::floor(L.hx0)); x <= int(std::ceil(L.hx1)); ++x) cv.vspanAA(x, L.hy0, L.hy1, housing, L.clipBottom);
+        cv.blitScaled(gfx.lampGlow, L.lx - L.size / 2, L.ly - L.size / 2, L.size, L.size, false, L.clipBottom, 0, 0, L.alpha);
         cv.setClip(keep);
+    };
+    auto drawLamps = [&] {
+        for (Lamp& L : lamps) if (!L.done) drawLamp(L);   // far to near
+        lamps.clear();
+    };
+    // Sprites (checkpoint gantries, signs) and cars nearer than a lamp must cover it, so a lamp whose glow
+    // overlaps one of them is drawn early, at its proper depth, just before that object.
+    struct Occluder { double x0, y0, x1, y1; };
+    auto flushLampsBehind = [&](const Occluder& o) {
+        for (Lamp& L : lamps) {
+            if (L.done) continue;
+            double r = L.size / 2;
+            if (L.lx + r > o.x0 && L.lx - r < o.x1 && L.ly + r > o.y0 && L.ly - r < o.y1) drawLamp(L);
+        }
     };
     // concrete tunnel barriers, guardrails and tunnel lamps of one segment
     auto drawWalls = [&](int n) {
@@ -791,6 +906,7 @@ void renderView(Canvas& cv, const Rect& vp, const Race& race, int carIndex, cons
                 double sx = p.x1 + sc * si.offset * ROAD_WIDTH * focal;
                 if (sx + dw / 2 < vp.x || sx - dw / 2 > vp.x + vp.w) continue;
                 bool flip = SPRITE_INFO[si.type].mirrorRight && si.offset > 0;
+                if (!lamps.empty()) flushLampsBehind({sx - dw / 2, p.y1 - dh, sx + dw / 2, p.y1});
                 cv.blitScaled(bmp, sx - dw / 2, p.y1 - dh, dw, dh, flip, p.clip, fog, th.fogColor);
             }
         }
@@ -816,8 +932,12 @@ void renderView(Canvas& cv, const Rect& vp, const Race& race, int carIndex, cons
             // chase view: farther cars are seen flatter (more from behind), nearer ones more from above
             double ratio = (ry - horizonY) / (bottomY - horizonY);
             double viewElev = std::atan(std::tan(CAR_ELEV_DEG[CAR_ELEV_LEVEL] * M_PI / 180) * ratio) * 180 / M_PI;
+            if (!lamps.empty()) flushLampsBehind({carX - w / 2, ry - lift - w * CAR_BMP_H / CAR_BMP_W, carX + w / 2, ry});
             drawCarSprite(cv, c, carX, ry - lift, ry, w, p.clip, fogC, fogCol, std::clamp(1 - c.air / 2400, 0.35, 1.0), viewAngle,
                           viewElev, unsigned(opt.frame));
+            if (c.drifting && !c.airborne && bodyW > 4)       // CPU drivers drift too
+                drawDriftSparks(cv, g_tyrePts, carX, ry, bodyW, p.clip, race.time, unsigned(r.idx) * 101, c.driftVis,
+                                c.inTunnel ? 0 : fogC);   // sparks glow even in the dark of a tunnel
             if (c.onDirt && !c.airborne && c.speed > 2000 * SPEED_SCALE) {     // dust cloud behind cars on dirt
                 for (int i = 0; i < 3; ++i) {
                     double age = std::fmod(race.time * 2.5 + i / 3.0 + r.idx * 0.37, 1.0);
@@ -850,24 +970,12 @@ void renderView(Canvas& cv, const Rect& vp, const Race& race, int carIndex, cons
         // dust / tyre smoke (soft alpha puffs drifting up and back)
         bool dust = (car.offroad || (car.onDirt && !car.airborne)) && car.speed > 400;
         bool smoke = car.skid > 0.3 && car.speed > 2000 * SPEED_SCALE;
-        if (dust || smoke) {
-            const Bitmap& pb = dust ? gfx.dust : gfx.smoke;
-            const bool drift = car.drifting && !dust;       // drifting: thick clouds, thrown out with the swinging tail
-            const int n = drift ? 14 : 8;
-            for (int i = 0; i < n; ++i) {
-                double age = std::fmod(race.time * 3.0 + double(i) / n, 1.0);       // 0..1 life cycle
-                unsigned sd = unsigned(std::floor(race.time * 3.0 + double(i) / n)) * 31 + i * 7 + carIndex * 101;
-                double side = (i % 2) ? 1 : -1;
-                double px = cx + side * bw * (0.36 + age * 0.15) + (frand(sd) - 0.5) * bw * 0.1;
-                double py = by - bh * 0.05 - age * bh * 0.6;
-                double sz = bw * (0.16 + age * 0.26);
-                if (drift) {
-                    px -= car.driftVis * bw * (0.1 + age * 0.35);
-                    sz *= 1.35;
-                }
-                cv.blitScaled(pb, px - sz / 2, py - sz / 2, sz, sz, false, 1e9, 0, 0, (1 - age) * 0.9);
-            }
-        }
+        const bool drift = car.drifting && !car.airborne && !dust;
+        if (drift)                                          // drifting: a shower of sparks instead of smoke
+            drawDriftSparks(cv, g_tyrePts, cx, by, bw, 1e9, race.time, unsigned(carIndex) * 101, car.driftVis, 0);
+        else if (dust || smoke)
+            drawTyreSmoke(cv, dust ? gfx.dust : gfx.smoke, g_tyrePts, cx, by, bw, 1e9, race.time, unsigned(carIndex) * 101,
+                          tint, TUNNEL_BLACK);
         if (car.bumpTimer > 0) {
             for (int i = 0; i < 5; ++i) {
                 unsigned sd = opt.frame * 17 + i * 13;

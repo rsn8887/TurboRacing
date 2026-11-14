@@ -671,7 +671,7 @@ PlayerInput pilotInput(const Race& r, int idx, double caution) {
     // TURBO_PILOT_FX=1: also use nitro on long straights and drift into the sharper bends (a brake tap on entry)
     static const bool fx = std::getenv("TURBO_PILOT_FX") != nullptr;
     if (fx) {
-        if (target >= CAR_STATS[c.type].top * MAX_SPEED * 0.9 && c.nitro > 0.25 && std::fabs(s.curve) < 1) in.nitro = true;
+        if (target >= CAR_STATS[c.type].top * MAX_SPEED * 0.9 && (c.nitro >= 1.0 || c.boosting) && std::fabs(s.curve) < 1) in.nitro = true;
         if (c.drifting) { in.throttle = 1; in.brake = 0; }        // drifting: flat out through the bend
         double bendAhead = 0;
         for (int k = 2; k < 12; ++k) bendAhead = std::max(bendAhead, std::fabs(t.find(c.dist + k * SEG_LEN).curve));

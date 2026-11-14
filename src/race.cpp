@@ -124,11 +124,12 @@ double Race::delta(double a, double b) const {
 
 // How the difficulty changes the CPU drivers (medium = as they always were): their pace on the straights,
 // the speed they carry into bends, how hard they accelerate out of them, and how often they make mistakes.
-struct Difficulty { double pace, corner, accel, mistakes; };
+// nitro: how eagerly a CPU driver fires a full bar (x); drift: chance to drift through a sharp bend
+struct Difficulty { double pace, corner, accel, mistakes, nitro, drift; };
 constexpr Difficulty DIFFICULTY[3] = {
-    {0.90, 0.92, 0.85, 1.8},   // easy
-    {1.00, 1.00, 1.00, 1.0},   // medium
-    {1.05, 1.06, 1.15, 0.5},   // hard
+    {0.90, 0.92, 0.85, 1.8, 0.35, 0.10},   // easy
+    {1.00, 1.00, 1.00, 1.0, 1.00, 0.22},   // medium
+    {1.05, 1.06, 1.15, 0.5, 1.70, 0.35},   // hard
 };
 
 void Race::start(int stage, const std::vector<Driver>& drivers, const Options& opt, bool attractMode) {
@@ -174,6 +175,8 @@ void Race::start(int stage, const std::vector<Driver>& drivers, const Options& o
         if (d.player < 0) {
             c.corner *= DIFFICULTY[difficulty_].corner;
             c.accelK *= DIFFICULTY[difficulty_].accel;
+            c.nitro = rnd(0.3, 1.0);   // staggered, so the field doesn't all fire at once
+            c.nitroWait = rnd(0.5, 1.5) * AI_NITRO_WAIT / DIFFICULTY[difficulty_].nitro;
         }
         int col = g % 2;                       // pole on the left, then alternating sides
         c.dist = -GRID_FRONT - g * GRID_SLOT;
@@ -324,9 +327,10 @@ void Race::updateHuman(Car& c, const PlayerInput& inRaw, double dt) {
     }
     c.driftVis += ((c.drifting ? c.driftDir : 0) - c.driftVis) * std::min(1.0, dt * 6);
 
-    // ---- nitrous: hold the button (with the throttle down) until the bar is empty; it refills slowly, and
-    // faster while drifting
-    bool boost = in.nitro && racing && c.nitro > 0 && in.throttle > 0.1;
+    // ---- nitrous: it can only be fired with a full bar; then it burns while the button is held (with the
+    // throttle down) until the bar is empty. It refills slowly, and faster while drifting.
+    bool want = in.nitro && racing && in.throttle > 0.1;
+    bool boost = want && (c.boosting ? c.nitro > 0 : c.nitro >= 1.0);
     if (boost && !c.boosting) audio.play(SFX_NITRO);
     c.boosting = boost;
     if (boost) c.nitro = std::max(0.0, c.nitro - dt / NITRO_TIME);
@@ -461,7 +465,8 @@ void Race::updateAI(Car& c, double dt) {
     for (int k = 0; k < 36; k += 2) maxC = std::max(maxC, std::fabs(track.find(c.dist + k * SEG_LEN).curve));
     bool dirtAhead = track.find(c.dist).surface == SURF_DIRT || track.find(c.dist + 10 * SEG_LEN).surface == SURF_DIRT;
     double slide = dirtAhead ? DIRT_SLIDE / DIRT_GRIP : 1.0;
-    if (maxC > 0.1) target = std::min(target, MAX_SPEED * std::min(1.0, c.corner / (CENTRIFUGAL * slide * maxC)));
+    const double cornerK = c.drifting ? AI_DRIFT_CORNER : 1.0;
+    if (maxC > 0.1) target = std::min(target, MAX_SPEED * std::min(1.0, cornerK * c.corner / (CENTRIFUGAL * slide * maxC)));
     if (dirtAhead) target = std::min(target, MAX_SPEED * st.dirtTop * (0.75 + 0.25 * c.skill));
     // hills: slower uphill, faster downhill
     double slope = track.slopeAt(c.dist + 3 * SEG_LEN);
@@ -510,6 +515,55 @@ void Race::updateAI(Car& c, double dt) {
     double dx = c.targetX - c.x;
     double step = dt * 0.9 * (0.3 + sp);
     c.x += std::clamp(dx, -step, step);
+
+    // ---- nitro and drift, like the player (not for cars on autopilot after the finish)
+    const bool aiRacing = phase == RacePhase::Racing && !c.autopilot && !c.finished;
+    const Difficulty& dfc = DIFFICULTY[difficulty_];
+    const double curNow = track.find(c.dist).curve;
+    bool dirtHere = track.find(c.dist).surface == SURF_DIRT;
+    // drift: decide once per sharp bend (better drivers drift more); it ends when the bend does
+    if (std::fabs(curNow) < 0.5) c.driftRolled = false;
+    if (!c.drifting && !c.driftRolled && aiRacing && std::fabs(curNow) >= AI_DRIFT_MIN) {
+        c.driftRolled = true;
+        if (!c.airborne && !dirtHere && sp > DRIFT_MIN_SPEED && c.mistake <= 0 &&
+            rnd(0, 1) < dfc.drift * (0.5 + 0.5 * c.skill)) {
+            c.drifting = true;
+            c.driftDir = curNow > 0 ? 1 : -1;
+            c.driftTime = 0;
+        }
+    }
+    if (c.drifting) {
+        c.driftTime += dt;
+        if (!aiRacing || std::fabs(curNow) < 1.0 || curNow * c.driftDir < 0 || sp < DRIFT_MIN_SPEED * 0.75 ||
+            c.airborne || dirtHere || c.mistake > 0)
+            c.drifting = false;
+    }
+    c.driftVis += ((c.drifting ? c.driftDir : 0) - c.driftVis) * std::min(1.0, dt * 6);
+    // nitro: only from a full bar, after a short wait, on a clear stretch (no sharp bend or gravel ahead, nobody
+    // right in front); a bend coming up cuts it. Drivers near a human player are keener, to keep it a fight.
+    bool nearHuman = false;
+    for (auto& o : cars)
+        if (o.player >= 0 && std::fabs(delta(c.dist, o.dist)) < 40 * SEG_LEN) nearHuman = true;
+    const bool clear = maxC < 1.2 && !dirtAhead && !(blocker && bestDz < 10 * SEG_LEN) && !c.airborne;
+    if (c.boosting) {
+        c.nitro -= dt / NITRO_TIME;
+        if (c.nitro <= 0 || !aiRacing || maxC > 2.0 || dirtAhead) { c.nitro = std::max(0.0, c.nitro); c.boosting = false; }
+    } else {
+        c.nitro = std::min(1.0, c.nitro + dt / NITRO_RECHARGE);
+        if (aiRacing && c.nitro >= 1.0 && clear && c.mistake <= 0) {
+            c.nitroWait -= dt * (nearHuman ? 2.0 : 1.0);
+            if (c.nitroWait <= 0) {
+                c.boosting = true;
+                c.nitroWait = rnd(0.5, 1.5) * AI_NITRO_WAIT / dfc.nitro;
+                for (auto& o : cars)   // you hear it when it goes off right next to you
+                    if (o.player >= 0 && std::fabs(delta(c.dist, o.dist)) < 12 * SEG_LEN) { audio.play(SFX_NITRO); break; }
+            }
+        }
+    }
+    if (c.drifting) c.nitro = std::min(1.0, c.nitro + dt * DRIFT_NITRO);
+    c.boostVis += ((c.boosting ? 1.0 : 0.0) - c.boostVis) * std::min(1.0, dt * 4);
+    if (c.boosting) target *= NITRO_TOP;
+
     // what the wheel would show: lane changes plus steering into the bend (as much as a driver needs to hold
     // the line against the centrifugal push at this speed), so cars in a bend are seen turned into it
     double bend = c.airborne ? 0 : sp * track.find(c.dist).curve * CENTRIFUGAL / st.grip;
@@ -519,14 +573,15 @@ void Race::updateAI(Car& c, double dt) {
     double gslope = c.airborne ? 0 : track.groundSlope(c.dist);
     bool dirtNow = track.find(c.dist).surface == SURF_DIRT;
     if (c.airborne) c.speed -= c.speed * 0.01 * dt;
-    else if (c.speed < target) c.speed += carAccel(st, sp, 1.0, dirtNow, false, gslope) * c.accelK * MAX_SPEED * dt;
+    else if (c.speed < target) c.speed += (carAccel(st, sp, 1.0, dirtNow, false, gslope) * c.accelK + (c.boosting ? NITRO_ACCEL : 0)) * MAX_SPEED * dt;
     else c.speed = std::max(target, c.speed + (carAccel(st, sp, 0, dirtNow, false, gslope) - BRAKE_DECEL * 0.5) * MAX_SPEED * dt);
     c.braking = c.speed > target * 1.04 && slope > -0.05;
     c.speed = std::clamp(c.speed, 0.0, MAX_SPEED * OVERSPEED);
     c.gear = std::min(NUM_GEARS - 1, int(sp * 5));
     c.rpm = std::max(0.15, std::min(1.0, c.speed / gearTop(c.gear)));
+    if (c.drifting && !c.airborne) c.speed = std::max(0.0, c.speed - DRIFT_SCRUB * MAX_SPEED * dt);
     c.throttle = c.braking ? 0 : 0.8;
-    c.skid = 0;
+    c.skid = c.drifting && !c.airborne ? 1.0 : 0;
     c.offroad = false;
 }
 

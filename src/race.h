@@ -33,6 +33,8 @@ struct Car {
     double skill = 0.85, targetX = 0, laneTimer = 0;
     // AI personality so the field spreads out instead of driving as a pack
     double paceFreq = 0.1, pacePhase = 0, corner = 1.0, accelK = 1.0, mistake = 0;
+    double nitroWait = 0;        // CPU: how long it waits with a full bar before it fires the nitro
+    bool driftRolled = false;    // CPU: already decided whether to drift through the current bend
     bool autopilot = false;
     // race state
     int cpPassed = -1;         // number of half-laps passed (0 = crossed start)
