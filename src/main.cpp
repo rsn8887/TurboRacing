@@ -162,7 +162,7 @@ struct App {
     }
 
     // ------------------------------------------------------------- menu ----
-    enum Item { IT_START, IT_MODE, IT_STAGE, IT_PLAYERS, IT_CAR1, IT_GEARS1, IT_CAR2, IT_GEARS2, IT_LAPS, IT_SOUND, IT_QUIT };
+    enum Item { IT_START, IT_MODE, IT_STAGE, IT_PLAYERS, IT_CAR1, IT_GEARS1, IT_CAR2, IT_GEARS2, IT_LAPS, IT_DIFFICULTY, IT_SOUND, IT_QUIT };
     std::vector<Item> menuItems() const {
         std::vector<Item> v = {IT_START, IT_MODE};
         if (!opt.championship) v.push_back(IT_STAGE);
@@ -171,6 +171,7 @@ struct App {
         v.push_back(IT_GEARS1);
         if (opt.players > 1) { v.push_back(IT_CAR2); v.push_back(IT_GEARS2); }
         v.push_back(IT_LAPS);
+        v.push_back(IT_DIFFICULTY);
         v.push_back(IT_SOUND);
 #ifndef __SWITCH__
         v.push_back(IT_QUIT);
@@ -188,6 +189,7 @@ struct App {
         case IT_GEARS1:  return {"GEARS P1", opt.manual[0] ? "MANUAL" : "AUTOMATIC"};
         case IT_GEARS2:  return {"GEARS P2", opt.manual[1] ? "MANUAL" : "AUTOMATIC"};
         case IT_LAPS:    return {"LAPS", std::to_string(opt.laps)};
+        case IT_DIFFICULTY: { static const char* const D[] = {"EASY", "MEDIUM", "HARD"}; return {"DIFFICULTY", D[opt.difficulty]}; }
         case IT_SOUND:   return {"SOUND", opt.sound ? "ON" : "OFF"};
         case IT_QUIT:    return {"QUIT", ""};
         }
@@ -203,6 +205,7 @@ struct App {
         case IT_GEARS1: opt.manual[0] = !opt.manual[0]; break;
         case IT_GEARS2: opt.manual[1] = !opt.manual[1]; break;
         case IT_LAPS: opt.laps = std::clamp(opt.laps + d, 1, 9); break;
+        case IT_DIFFICULTY: opt.difficulty = (opt.difficulty + d + 3) % 3; break;
         case IT_SOUND: opt.sound = !opt.sound; audio.setEnabled(opt.sound); break;
         default: return;
         }
@@ -383,8 +386,13 @@ struct App {
         sub.color2 = rgb(160, 210, 255);
         text.draw("PSEUDO 3D ARCADE RACER", SCREEN_W / 2.0, 72, sub, ALIGN_CENTER);
         auto items = menuItems();
-        int w = 400, rowH = 21, h = int(items.size()) * rowH + 14;
-        int x0 = SCREEN_W / 2 - w / 2, y0 = 100;
+        // rows shrink for long menus (single race + 2 players) so the panel stays above the hint lines
+        const int n = int(items.size()), y0 = 100;
+        int rowH = std::min(21, (SCREEN_H - 46 - y0 - 14) / n);
+        const bool driftTip = rowH >= 17;
+        if (!driftTip) rowH = std::min(21, (SCREEN_H - 34 - y0 - 14) / n);
+        int w = 400, h = n * rowH + 14;
+        int x0 = SCREEN_W / 2 - w / 2;
         panel(x0, y0, w, h);
         for (int i = 0; i < int(items.size()); ++i) {
             bool sel = i == menuSel;
@@ -424,7 +432,7 @@ struct App {
             }
         }
         TextStyle hint = ui(9.5, rgb(225, 228, 240));
-        text.draw("TAP THE BRAKE IN A BEND TO DRIFT  -  DRIFTING REFILLS THE NITRO", SCREEN_W / 2.0, SCREEN_H - 42, hint, ALIGN_CENTER);
+        if (driftTip) text.draw("TAP THE BRAKE IN A BEND TO DRIFT  -  DRIFTING REFILLS THE NITRO", SCREEN_W / 2.0, SCREEN_H - 42, hint, ALIGN_CENTER);
         text.draw("P1: ARROWS, SPACE NITRO, Z/X GEARS    P2: WASD, SHIFT NITRO, Q/E    PADS: A/B, X/Y NITRO, LB/RB", SCREEN_W / 2.0, SCREEN_H - 30, hint, ALIGN_CENTER);
         text.draw("v" GAME_VERSION "  -  by rsn8887", SCREEN_W / 2.0, SCREEN_H - 16, ui(8.5, rgb(170, 175, 200)), ALIGN_CENTER);
     }
@@ -687,9 +695,9 @@ int main(int argc, char** argv) {
 #endif
     // test mode: --shot out.bmp [--stage N] [--seconds S] [--players P] [--title] [--auto]
     const char* shot = nullptr;
-    int shotStage = 0, shotPlayers = 1;
+    int shotStage = 0, shotPlayers = 1, shotDifficulty = 1;
     double shotSeconds = 3;
-    bool shotTitle = false, shotAuto = false, bench = false, info = false, carsheet = false;
+    bool shotTitle = false, shotSingle = false, shotAuto = false, bench = false, info = false, carsheet = false;
     double pilot = 0;   // --pilot <caution 0..1>: see pilotInput
     double telemetry = 0;
     int winW = 0, winH = 0;
@@ -701,7 +709,9 @@ int main(int argc, char** argv) {
         else if (!std::strcmp(argv[i], "--stage") && i + 1 < argc) shotStage = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--seconds") && i + 1 < argc) shotSeconds = std::atof(argv[++i]);
         else if (!std::strcmp(argv[i], "--players") && i + 1 < argc) shotPlayers = std::atoi(argv[++i]);
+        else if (!std::strcmp(argv[i], "--difficulty") && i + 1 < argc) shotDifficulty = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--title")) shotTitle = true;
+        else if (!std::strcmp(argv[i], "--single")) shotSingle = true;
         else if (!std::strcmp(argv[i], "--auto")) shotAuto = true;
         else if (!std::strcmp(argv[i], "--pilot") && i + 1 < argc) pilot = std::atof(argv[++i]);
         else if (!std::strcmp(argv[i], "--bench")) bench = true;
@@ -752,11 +762,15 @@ int main(int argc, char** argv) {
         std::vector<double> frameMs;
         if (shotCar >= 0) app.opt.carType[0] = app.opt.carType[1] = shotCar;
         if (shotTitle) {
+            app.opt.players = shotPlayers;
+            app.opt.difficulty = std::clamp(shotDifficulty, 0, 2);
+            if (shotSingle) app.opt.championship = false;
             if (shotMenu >= 0) app.menuSel = shotMenu;
             app.startAttract(shotStage);
             for (int i = 0; i < int(shotSeconds * 60); ++i) app.tick(STEP);
         } else {
             app.opt.players = shotPlayers;
+            app.opt.difficulty = std::clamp(shotDifficulty, 0, 2);
             app.opt.championship = false;
             app.opt.startStage = shotStage;
             Uint64 s0 = SDL_GetPerformanceCounter();

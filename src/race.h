@@ -69,6 +69,7 @@ struct Options {
     bool sound = true;
     int startStage = 0;
     bool championship = true;
+    int difficulty = 1;       // CPU drivers: 0 easy, 1 medium, 2 hard (see DIFFICULTY in race.cpp)
 };
 
 enum class RacePhase { Countdown, Racing, Over };
@@ -97,6 +98,7 @@ public:
 
 private:
     double bonusA_ = 30, bonusB_ = 30;
+    int difficulty_ = 1;
     void updateHuman(Car& c, const PlayerInput& in, double dt);
     void updateAI(Car& c, double dt);
     void physicsCommon(Car& c, double dt);

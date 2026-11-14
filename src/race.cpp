@@ -122,8 +122,18 @@ double Race::delta(double a, double b) const {
     return d;
 }
 
+// How the difficulty changes the CPU drivers (medium = as they always were): their pace on the straights,
+// the speed they carry into bends, how hard they accelerate out of them, and how often they make mistakes.
+struct Difficulty { double pace, corner, accel, mistakes; };
+constexpr Difficulty DIFFICULTY[3] = {
+    {0.90, 0.92, 0.85, 1.8},   // easy
+    {1.00, 1.00, 1.00, 1.0},   // medium
+    {1.05, 1.06, 1.15, 0.5},   // hard
+};
+
 void Race::start(int stage, const std::vector<Driver>& drivers, const Options& opt, bool attractMode) {
     attract = attractMode;
+    difficulty_ = attract ? 1 : std::clamp(opt.difficulty, 0, 2);
     track.build(stage);
     laps = attract ? 999 : opt.laps;
     manual[0] = opt.manual[0]; manual[1] = opt.manual[1];
@@ -161,6 +171,10 @@ void Race::start(int stage, const std::vector<Driver>& drivers, const Options& o
         c.pacePhase = rnd(0, 6.283);
         c.corner = rnd(0.88, 1.04) + (c.skill - 0.9) * 1.3;   // better drivers carry much more speed into bends
         c.accelK = rnd(0.9, 1.1) * (0.8 + 1.0 * (c.skill - 0.79));   // and get out of them quicker
+        if (d.player < 0) {
+            c.corner *= DIFFICULTY[difficulty_].corner;
+            c.accelK *= DIFFICULTY[difficulty_].accel;
+        }
         int col = g % 2;                       // pole on the left, then alternating sides
         c.dist = -GRID_FRONT - g * GRID_SLOT;
         if (attract) c.dist += SEG_LEN * 40;
@@ -437,9 +451,10 @@ void Race::updateAI(Car& c, double dt) {
     // personality: each driver's pace drifts slowly up and down, and now and then someone makes a
     // mistake and lifts for a moment - this spreads the field out over a lap
     if (!c.autopilot) {
-        target *= 1 + 0.06 * std::sin(time * c.paceFreq * 6.283 + c.pacePhase);
+        const Difficulty& df = DIFFICULTY[difficulty_];
+        target *= df.pace * (1 + 0.06 * std::sin(time * c.paceFreq * 6.283 + c.pacePhase));
         if (c.mistake > 0) { c.mistake -= dt; target *= 0.75; }
-        else if (rnd(0, 1) < dt * (0.02 + 0.06 * (1 - c.skill))) c.mistake = rnd(0.8, 2.2);   // weaker drivers err more
+        else if (rnd(0, 1) < dt * (0.02 + 0.06 * (1 - c.skill)) * df.mistakes) c.mistake = rnd(0.8, 2.2);   // weaker drivers err more
     }
     // slow down for upcoming bends (look further ahead at higher speed)
     double maxC = 0;
